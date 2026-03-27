@@ -1,0 +1,39 @@
+# === Documents internes (non versionnés) ===
+docs/01_contexte_projet.md
+docs/02_etapes_developpement.md
+
+# === Environnement Python ===
+env/
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# === Variables d'environnement (secrets) ===
+.env
+
+# === Index Faiss (fichiers volumineux générés) ===
+*.faiss
+faiss_index/
+
+# === IDE / Éditeur ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Données générées ===
+data/*.csv
+data/*.json
+!data/.gitkeep
+
+# === Logs ===
+*.log
