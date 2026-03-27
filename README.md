@@ -200,7 +200,7 @@ pytest tests/ -v
 
 Le projet contient **2 suites de tests** :
 - `tests/test_api.py` — 12 tests pour l'API REST (endpoints, erreurs, Swagger)
-- `tests/test_scripts.py` — 18 tests pour les scripts du pipeline (nettoyage, chunking, fetch, indexation, RAG)
+- `tests/test_scripts.py` — 20 tests pour les scripts du pipeline (nettoyage, chunking, fetch, indexation, RAG)
 
 ## Évaluation RAG (Ragas)
 
@@ -265,7 +265,7 @@ pull-events/
 │   └── check_imports.py       # Vérification de l'environnement
 ├── tests/                     # Tests unitaires
 │   ├── test_api.py            # Tests de l'API (12 tests)
-│   └── test_scripts.py        # Tests du pipeline (18 tests)
+│   └── test_scripts.py        # Tests du pipeline (20 tests)
 ├── data/                      # Données (non versionnées sauf test)
 │   └── test_questions.json    # Jeu de test annoté
 ├── docs/                      # Documentation
