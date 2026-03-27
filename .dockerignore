@@ -1,0 +1,17 @@
+env/
+venv/
+.venv/
+.git/
+.gitignore
+.ruff_cache/
+.pytest_cache/
+.vscode/
+__pycache__/
+*.pyc
+docs/
+data/*.csv
+data/raw_events.json
+data/chunks.json
+*.log
+.env
+.DS_Store

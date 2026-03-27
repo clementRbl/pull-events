@@ -12,7 +12,33 @@ POC d'un chatbot intelligent basé sur le **Retrieval-Augmented Generation (RAG)
 | API REST | FastAPI |
 | Source de données | API Open Agenda |
 
+| Conteneurisation | Docker |
+
 ## Installation
+
+### Option 1 — Docker (recommandé)
+
+```bash
+# Build de l'image
+docker build -t puls-events .
+
+# Lancer le conteneur (clé API passée au runtime)
+docker run -p 8000:8000 -e MISTRAL_API_KEY=votre_clé_ici puls-events
+```
+
+L'API est accessible sur `http://localhost:8000/docs`.
+
+> **Note** : L'index Faiss doit être présent dans `data/faiss_index/` avant le build, ou reconstruit via `/rebuild` après le lancement.
+
+Pour monter un index existant :
+```bash
+docker run -p 8000:8000 \
+  -e MISTRAL_API_KEY=votre_clé_ici \
+  -v $(pwd)/data:/app/data \
+  puls-events
+```
+
+### Option 2 — Installation locale
 
 ### 1. Cloner le projet
 
@@ -139,6 +165,8 @@ pull-events/
 ├── data/                      # Données (non versionnées sauf test)
 │   └── test_questions.json    # Jeu de test annoté
 ├── docs/                      # Documentation
+├── Dockerfile                 # Conteneurisation
+├── .dockerignore
 ├── .env.example               # Template des variables d'environnement
 ├── .gitignore
 ├── README.md
