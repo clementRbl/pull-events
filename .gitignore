@@ -34,6 +34,7 @@ Thumbs.db
 data/*.csv
 data/*.json
 !data/.gitkeep
+!data/test_questions.json
 
 # === Logs ===
 *.log

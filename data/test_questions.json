@@ -1,0 +1,22 @@
+[
+    {
+        "question": "Quels concerts sont prévus à Paris prochainement ?",
+        "ground_truth": "Plusieurs concerts sont prévus à Paris dans différentes salles, couvrant divers genres musicaux comme le jazz, le rock ou la musique classique."
+    },
+    {
+        "question": "Y a-t-il des expositions à Versailles ?",
+        "ground_truth": "Des expositions sont proposées à Versailles, notamment au Château de Versailles et dans les galeries et centres culturels de la ville."
+    },
+    {
+        "question": "Que faire avec des enfants ce weekend en Île-de-France ?",
+        "ground_truth": "Plusieurs activités familiales sont disponibles en Île-de-France : spectacles jeune public, ateliers créatifs, visites de musées adaptées aux enfants et événements en plein air."
+    },
+    {
+        "question": "Y a-t-il des spectacles de théâtre à Paris ?",
+        "ground_truth": "Des spectacles de théâtre sont programmés dans plusieurs salles parisiennes, proposant des pièces classiques et contemporaines."
+    },
+    {
+        "question": "Quels événements gratuits sont disponibles en Île-de-France ?",
+        "ground_truth": "Plusieurs événements gratuits sont proposés en Île-de-France, incluant des expositions en accès libre, des concerts gratuits et des festivals ouverts au public."
+    }
+]
