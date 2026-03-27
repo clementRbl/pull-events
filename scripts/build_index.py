@@ -17,7 +17,6 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_mistralai import MistralAIEmbeddings
 
-# Charger les variables d'environnement
 load_dotenv()
 
 # Configuration du logging
@@ -27,7 +26,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# === Constantes ===
+# Constantes
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 CHUNKS_FILE = DATA_DIR / "chunks.json"
 INDEX_DIR = DATA_DIR / "faiss_index"
@@ -94,8 +93,6 @@ def chunks_to_documents(chunks: list[dict]) -> list[Document]:
 
 def get_embeddings() -> MistralAIEmbeddings:
     """Initialise le modèle d'embeddings Mistral.
-
-    La clé API est lue depuis la variable d'environnement MISTRAL_API_KEY.
 
     Returns:
         Instance MistralAIEmbeddings configurée.
@@ -228,7 +225,7 @@ def test_search(vectorstore: FAISS):
         "Spectacle pour enfants en Île-de-France",
     ]
 
-    logger.info("=== Test de recherche de similarité ===")
+    logger.info("Test de recherche de similarité")
     for query in test_queries:
         results = vectorstore.similarity_search(query, k=3)
         logger.info("\nRequête : '%s'", query)
