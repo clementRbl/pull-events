@@ -1,0 +1,40 @@
+[tool.ruff]
+# Version Python cible
+target-version = "py310"
+
+# Longueur maximale des lignes
+line-length = 88
+
+# Dossiers exclus de l'analyse
+exclude = [
+    "env",
+    "venv",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+# Règles activées :
+# E/W = style pycodestyle, F = pyflakes, I = isort (tri des imports),
+# UP = pyupgrade, S = sécurité (bandit), B = bugbear
+select = ["E", "W", "F", "I", "UP", "S", "B"]
+
+# Règles ignorées :
+# S101 = usage de assert (utile dans les tests)
+ignore = ["S101"]
+
+# Correction automatique activée pour toutes les règles fixables
+fixable = ["ALL"]
+
+[tool.ruff.lint.isort]
+# Imports du projet reconnus comme first-party
+known-first-party = ["scripts"]
+
+[tool.ruff.format]
+# Style de guillemets : double
+quote-style = "double"
+
+# Indentation : espaces
+indent-style = "space"
