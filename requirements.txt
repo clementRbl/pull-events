@@ -1,0 +1,24 @@
+# Framework RAG
+langchain>=0.3.0
+langchain-mistralai>=0.2.0
+langchain-community>=0.3.0
+
+# Base vectorielle
+faiss-cpu>=1.9.0
+
+# API REST
+fastapi>=0.115.0
+uvicorn>=0.34.0
+
+# Données
+pandas>=2.2.0
+requests>=2.32.0
+
+# Gestion des secrets
+python-dotenv>=1.0.0
+
+# Évaluation RAG (étape 5)
+ragas>=0.2.0
+
+# Outils de développement
+ruff>=0.9.0
