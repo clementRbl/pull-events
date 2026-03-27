@@ -1,0 +1,55 @@
+graph TB
+    subgraph "Sources de données"
+        OA["API Open Agenda<br/>(OpenDataSoft)"]
+    end
+
+    subgraph "Pipeline d'ingestion"
+        FE["fetch_events.py<br/>Pagination curseur date<br/>Filtre : IDF, < 1 an"]
+        PD["prepare_data.py<br/>Nettoyage HTML<br/>Déduplication<br/>Chunking 2000 chars"]
+        BI["build_index.py<br/>Embeddings Mistral<br/>Batch 50 + retry<br/>Index Faiss"]
+    end
+
+    subgraph "Base vectorielle"
+        FAISS["Faiss Index<br/>17 383 vecteurs x 1024 dim"]
+    end
+
+    subgraph "Chaîne RAG - rag_chain.py"
+        RET["Retriever Faiss<br/>top_k = 5"]
+        PROMPT["Prompt Template<br/>Système + Utilisateur"]
+        LLM["Mistral LLM<br/>mistral-small-latest<br/>temperature=0.3"]
+        PARSER["StrOutputParser"]
+    end
+
+    subgraph "API REST - FastAPI"
+        HEALTH["/health GET"]
+        ASK["/ask POST"]
+        REBUILD["/rebuild POST"]
+        SWAGGER["Swagger /docs"]
+    end
+
+    subgraph "Évaluation"
+        EVAL["evaluate_rag.py<br/>Ragas"]
+        TEST["pytest<br/>tests unitaires"]
+    end
+
+    subgraph "Déploiement"
+        DOCKER["Docker<br/>Python 3.12-slim"]
+    end
+
+    OA -->|"HTTP JSON"| FE
+    FE -->|"raw_events.json"| PD
+    PD -->|"chunks.json"| BI
+    BI -->|"mistral-embed API"| FAISS
+
+    ASK -->|"question"| RET
+    RET -->|"5 chunks"| PROMPT
+    PROMPT --> LLM
+    LLM --> PARSER
+    PARSER -->|"réponse + sources"| ASK
+
+    REBUILD -->|"relance pipeline"| FE
+    RET -.->|"recherche"| FAISS
+
+    EVAL -.->|"métriques"| ASK
+    TEST -.->|"pytest"| ASK
+    DOCKER -->|"contient"| ASK
