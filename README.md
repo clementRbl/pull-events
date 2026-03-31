@@ -148,7 +148,7 @@ chmod +x launch.sh
 ## Lancer l'API
 
 ```bash
-uvicorn api.main:app --reload
+source .env && uvicorn api.main:app --reload
 ```
 
 L'API est accessible sur `http://localhost:8000`.
