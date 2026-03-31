@@ -86,8 +86,8 @@ graph TB
 # Build de l'image
 docker build -t puls-events .
 
-# Lancer le conteneur (clé API passée au runtime)
-docker run -p 8000:8000 -e MISTRAL_API_KEY=votre_clé_ici puls-events
+# Lancer le conteneur (clé API chargée depuis .env)
+docker run -p 8000:8000 --env-file .env puls-events
 ```
 
 L'API est accessible sur `http://localhost:8000/docs`.
@@ -97,7 +97,7 @@ L'API est accessible sur `http://localhost:8000/docs`.
 Pour monter un index existant :
 ```bash
 docker run -p 8000:8000 \
-  -e MISTRAL_API_KEY=votre_clé_ici \
+  --env-file .env \
   -v $(pwd)/data:/app/data \
   puls-events
 ```
