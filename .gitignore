@@ -16,7 +16,7 @@ build/
 # === Variables d'environnement (secrets) ===
 .env
 
-# === Index Faiss (fichiers volumineux générés) ===
+# === Index Faiss de référence (fichiers volumineux générés) ===
 *.faiss
 faiss_index/
 

@@ -6,18 +6,21 @@ graph TB
     subgraph "Pipeline d'ingestion"
         FE["fetch_events.py<br/>Pagination curseur date<br/>Filtre : IDF, < 1 an"]
         PD["prepare_data.py<br/>Nettoyage HTML<br/>Déduplication<br/>Chunking 2000 chars"]
-        BI["build_index.py<br/>Embeddings Mistral<br/>Batch 50 + retry<br/>Index Faiss"]
+        BI["build_index.py<br/>Embeddings Mistral<br/>Batch 50 + retry<br/>Table de travail puis échange"]
     end
 
-    subgraph "Base vectorielle"
-        FAISS["Faiss Index<br/>17 383 vecteurs x 1024 dim"]
+    subgraph "Base vectorielle - Docker Compose"
+        PG["PostgreSQL 17 + pgvector<br/>table event_chunks<br/>~39 000 vecteurs x 1024 dim<br/>index HNSW (cosinus)"]
     end
 
     subgraph "Chaîne RAG - rag_chain.py"
-        RET["Retriever Faiss<br/>top_k = 5"]
+        RET["Recherche vectorielle<br/>top_k = 5"]
         PROMPT["Prompt Template<br/>Système + Utilisateur"]
-        LLM["Mistral LLM<br/>mistral-small-latest<br/>temperature=0.3"]
-        PARSER["StrOutputParser"]
+        LLM["Mistral LLM<br/>ministral-8b-latest<br/>temperature=0.3"]
+    end
+
+    subgraph "Observabilité - Docker Compose"
+        LF["Langfuse v4 auto-hébergé<br/>trace par question<br/>latence, tokens, coût"]
     end
 
     subgraph "API REST - FastAPI"
@@ -28,28 +31,24 @@ graph TB
     end
 
     subgraph "Évaluation"
-        EVAL["evaluate_rag.py<br/>Ragas"]
+        EVAL["evaluate_rag.py<br/>Ragas + coûts<br/>20 questions"]
         TEST["pytest<br/>tests unitaires"]
-    end
-
-    subgraph "Déploiement"
-        DOCKER["Docker<br/>Python 3.12-slim"]
     end
 
     OA -->|"HTTP JSON"| FE
     FE -->|"raw_events.json"| PD
     PD -->|"chunks.json"| BI
-    BI -->|"mistral-embed API"| FAISS
+    BI -->|"mistral-embed API"| PG
 
     ASK -->|"question"| RET
     RET -->|"5 chunks"| PROMPT
     PROMPT --> LLM
-    LLM --> PARSER
-    PARSER -->|"réponse + sources"| ASK
+    LLM -->|"réponse + sources"| ASK
 
     REBUILD -->|"relance pipeline"| FE
-    RET -.->|"recherche"| FAISS
+    RET -.->|"SQL <=> cosinus"| PG
+    RET -.->|"span retrieval"| LF
+    LLM -.->|"generation : tokens + coût"| LF
 
     EVAL -.->|"métriques"| ASK
     TEST -.->|"pytest"| ASK
-    DOCKER -->|"contient"| ASK

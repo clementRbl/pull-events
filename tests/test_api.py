@@ -5,6 +5,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from api.main import app
+from scripts.vector_db import VectorStoreUnavailableError
 
 client = TestClient(app)
 
@@ -100,14 +101,14 @@ def test_ask_no_body():
 
 
 @patch("api.main.ask")
-def test_ask_index_not_found(mock_ask):
-    """POST /ask retourne 503 si l'index Faiss est absent."""
-    mock_ask.side_effect = FileNotFoundError("Index introuvable")
+def test_ask_vector_store_unavailable(mock_ask):
+    """POST /ask retourne 503 si la base vectorielle est indisponible."""
+    mock_ask.side_effect = VectorStoreUnavailableError("PostgreSQL injoignable")
 
     response = client.post("/ask", json={"question": "Test ?"})
 
     assert response.status_code == 503
-    assert "Index Faiss indisponible" in response.json()["detail"]
+    assert "Base vectorielle indisponible" in response.json()["detail"]
 
 
 @patch("api.main.ask")

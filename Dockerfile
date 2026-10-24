@@ -1,15 +1,16 @@
 FROM python:3.12-slim
 
+# uv installe les dépendances depuis uv.lock (versions figées)
+COPY --from=ghcr.io/astral-sh/uv:0.10.7 /uv /bin/uv
+
 WORKDIR /app
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PATH="/app/.venv/bin:$PATH"
 
-# Dépendances système pour faiss-cpu
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential && \
-    rm -rf /var/lib/apt/lists/*
-
-# Installer les dépendances Python
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Dépendances d'abord : cette couche reste en cache tant que le lockfile ne change pas
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copier le code source
 COPY api/ api/

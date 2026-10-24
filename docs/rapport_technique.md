@@ -1,5 +1,7 @@
 # Rapport technique — Assistant intelligent de recommandation d'événements culturels
 
+> **Version 1.0 (Faiss), livrable d'origine.** Ce rapport décrit le POC tel que livré : index Faiss, `mistral-small-latest`, `requirements.txt`. La version 1.1 remplace Faiss par PostgreSQL + pgvector, ajoute Langfuse et étend l'évaluation à 20 questions : voir la [section 11](#11-évolution-v11--pgvector-et-observabilité), le [README](../README.md) et [docs/evaluation](evaluation/README.md).
+
 ## 1. Objectifs du projet
 
 ### Contexte
@@ -451,3 +453,24 @@ python scripts/evaluate_rag.py
 docker build -t puls-events .
 docker run -p 8000:8000 -e MISTRAL_API_KEY=xxx -v $(pwd)/data:/app/data puls-events
 ```
+
+---
+
+## 11. Évolution v1.1 : pgvector et observabilité
+
+| Sujet | v1.0 | v1.1 |
+|---|---|---|
+| Base vectorielle | Faiss `IndexFlatL2`, fichier pickle chargé en mémoire | PostgreSQL 17 + pgvector, table `event_chunks`, index HNSW cosinus (`ef_search=100`) |
+| Reconstruction | L'index est réécrit sur disque | Table de travail puis échange en une transaction : pas de coupure de l'API |
+| Observabilité | Logs | Langfuse v4 auto-hébergé : une trace par question (recherche, génération, tokens, coût) |
+| Configuration | Constantes dans le code | Variables d'environnement (`scripts/config.py`), prêtes pour un déploiement cloud |
+| LLM | `mistral-small-latest` | `ministral-8b-latest` (quota de la clé API), modifiable via `LLM_MODEL` |
+| Évaluation | 5 questions, juge Mistral | 20 questions, juge Claude Haiku 5.5, latence et coût par question |
+| Dépendances | `requirements.txt` + pip | `pyproject.toml` + `uv.lock` |
+| Données | ~16 000 événements, 17 383 chunks | 37 338 événements, 39 089 chunks (normalisation Unicode NFKC) |
+
+Corrections faites au passage :
+- La v1 lançait deux recherches vectorielles par question (une pour les sources, une dans la chaîne LangChain). Il n'y en a plus qu'une.
+- Certaines descriptions contiennent des lettres « gras mathématiques » (𝗣𝗥𝗢𝗚𝗥𝗔𝗠𝗠𝗘) copiées des réseaux sociaux. Chacune coûte plusieurs tokens, et un chunk de 4 306 caractères atteignait 9 138 tokens, au-delà de la limite de 8 192 de `mistral-embed`. La normalisation NFKC le ramène à 1 709 tokens.
+
+Résultats avant/après (mêmes vecteurs, même LLM, même juge) : qualité inchangée aux erreurs de mesure près, recherche 3 fois plus rapide (14,8 → 5,6 ms), coût identique (0,17 $ pour 1 000 questions). Détail dans [docs/evaluation/README.md](evaluation/README.md).
