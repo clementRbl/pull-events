@@ -175,6 +175,25 @@ def test_build_event_text_minimal():
     assert "Événement test" in text
 
 
+def test_build_event_text_normalizes_decorative_letters():
+    """Les lettres « gras mathématiques » deviennent des lettres simples."""
+    row = pd.Series(
+        {
+            "title_fr": "Festival",
+            "daterange_fr": "",
+            "location_name": "",
+            "location_address": "",
+            "location_city": "",
+            "conditions_fr": "",
+            "keywords_fr": "",
+            "description_fr": "",
+            "longdescription_fr": "𝗣𝗥𝗢𝗚𝗥𝗔𝗠𝗠𝗘 𝗖𝗢𝗠𝗣𝗟𝗘𝗧",
+        }
+    )
+    text = build_event_text(row)
+    assert "PROGRAMME COMPLET" in text
+
+
 # === Tests fetch_events (fonctions unitaires) ===
 
 
@@ -260,19 +279,19 @@ def test_format_docs_multiple():
 
 
 def test_get_api_key_missing():
-    """_get_api_key lève ValueError si la clé est absente."""
+    """get_mistral_api_key lève ValueError si la clé est absente."""
     import pytest
 
-    from scripts.rag_chain import _get_api_key
+    from scripts.config import get_mistral_api_key
 
     with patch.dict("os.environ", {}, clear=True):
         with pytest.raises(ValueError, match="MISTRAL_API_KEY"):
-            _get_api_key()
+            get_mistral_api_key()
 
 
 def test_get_api_key_present():
-    """_get_api_key retourne la clé si elle est définie."""
-    from scripts.rag_chain import _get_api_key
+    """get_mistral_api_key retourne la clé si elle est définie."""
+    from scripts.config import get_mistral_api_key
 
     with patch.dict("os.environ", {"MISTRAL_API_KEY": "sk-test123"}):
-        assert _get_api_key() == "sk-test123"
+        assert get_mistral_api_key() == "sk-test123"

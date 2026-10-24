@@ -18,5 +18,65 @@
     {
         "question": "Quels événements gratuits sont disponibles en Île-de-France ?",
         "ground_truth": "Plusieurs événements gratuits sont proposés en Île-de-France, incluant des expositions en accès libre, des concerts gratuits et des festivals ouverts au public."
+    },
+    {
+        "question": "Quels festivals de musique ont lieu en Île-de-France ?",
+        "ground_truth": "Plusieurs festivals de musique sont organisés en Île-de-France, avec des concerts en plein air ou en salle et des genres variés."
+    },
+    {
+        "question": "Y a-t-il des ateliers d'écriture ou de lecture en bibliothèque ?",
+        "ground_truth": "Des bibliothèques et médiathèques d'Île-de-France proposent des ateliers d'écriture, des lectures publiques et des clubs de lecture."
+    },
+    {
+        "question": "Quelles visites guidées sont proposées à Paris ?",
+        "ground_truth": "Des visites guidées de quartiers, de monuments et de musées sont proposées à Paris, souvent sur réservation."
+    },
+    {
+        "question": "Y a-t-il des spectacles de danse en Seine-Saint-Denis ?",
+        "ground_truth": "Des spectacles de danse contemporaine ou hip-hop sont programmés dans des salles et centres culturels de Seine-Saint-Denis."
+    },
+    {
+        "question": "Quels événements sont organisés pour les Journées européennes du patrimoine ?",
+        "ground_truth": "Pour les Journées européennes du patrimoine, de nombreux monuments et lieux habituellement fermés ouvrent leurs portes avec des visites et animations."
+    },
+    {
+        "question": "Où voir une projection de cinéma en plein air ?",
+        "ground_truth": "Des projections de films en plein air sont organisées dans des parcs et places d'Île-de-France, souvent gratuitement en été."
+    },
+    {
+        "question": "Quelles conférences sur les sciences sont prévues ?",
+        "ground_truth": "Des conférences de vulgarisation scientifique sont proposées dans des médiathèques, universités et musées d'Île-de-France."
+    },
+    {
+        "question": "Y a-t-il des expositions de photographie à Paris ?",
+        "ground_truth": "Des expositions de photographie sont présentées dans des galeries, musées et centres culturels parisiens."
+    },
+    {
+        "question": "Quelles activités sont proposées pour les seniors ?",
+        "ground_truth": "Des activités adaptées aux seniors sont proposées : ateliers, conférences, sorties culturelles et animations dans les centres sociaux et médiathèques."
+    },
+    {
+        "question": "Y a-t-il des concerts de musique classique dans les Yvelines ?",
+        "ground_truth": "Des concerts de musique classique sont donnés dans les Yvelines, notamment dans des églises, châteaux et conservatoires."
+    },
+    {
+        "question": "Quels spectacles de marionnettes ou de contes pour enfants sont programmés ?",
+        "ground_truth": "Des spectacles de marionnettes et des heures du conte sont programmés pour les enfants dans des théâtres et médiathèques d'Île-de-France."
+    },
+    {
+        "question": "Y a-t-il des événements autour du jardinage ou de la nature ?",
+        "ground_truth": "Des ateliers de jardinage, balades nature et animations sur la biodiversité sont proposés dans des parcs, jardins partagés et médiathèques."
+    },
+    {
+        "question": "Quels événements ont lieu dans le Val-de-Marne ?",
+        "ground_truth": "Le Val-de-Marne accueille des événements variés : concerts, expositions, spectacles et ateliers dans ses villes et équipements culturels."
+    },
+    {
+        "question": "Y a-t-il des ateliers numériques ou d'initiation à l'informatique ?",
+        "ground_truth": "Des ateliers numériques et d'initiation à l'informatique sont proposés, notamment dans les médiathèques et espaces publics numériques."
+    },
+    {
+        "question": "Quel temps fera-t-il demain à Paris ?",
+        "ground_truth": "La base d'événements ne contient pas d'informations météorologiques ; l'assistant doit indiquer qu'il ne peut pas répondre."
     }
 ]

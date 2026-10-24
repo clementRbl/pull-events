@@ -2,12 +2,13 @@
 Préparation et nettoyage des données d'événements.
 
 Transforme les événements bruts (JSON) en chunks textuels
-structurés, prêts pour la vectorisation Faiss.
+structurés, prêts pour la vectorisation.
 """
 
 import json
 import logging
 import re
+import unicodedata
 from pathlib import Path
 
 import pandas as pd
@@ -166,7 +167,11 @@ def build_event_text(row: pd.Series) -> str:
     if description:
         parts.append(f"Description : {description}")
 
-    return "\n".join(parts)
+    # NFKC ramène les lettres décoratives (ex. « 𝗣𝗥𝗢𝗚𝗥𝗔𝗠𝗠𝗘 » copié des
+    # réseaux sociaux) à leur forme simple. Sans cela, ces caractères coûtent
+    # plusieurs tokens chacun et un chunk peut dépasser la limite de
+    # 8 192 tokens de mistral-embed.
+    return unicodedata.normalize("NFKC", "\n".join(parts))
 
 
 def split_text_into_chunks(text: str, max_chars: int = CHUNK_MAX_CHARS) -> list[str]:

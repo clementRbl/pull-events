@@ -36,8 +36,9 @@ def main():
     modules = [
         ("langchain", "langchain"),
         ("langchain_mistralai", "langchain-mistralai"),
-        ("langchain_community", "langchain-community"),
-        ("faiss", "faiss-cpu"),
+        ("langchain_postgres", "langchain-postgres"),
+        ("psycopg", "psycopg"),
+        ("langfuse", "langfuse"),
         ("fastapi", "fastapi"),
         ("uvicorn", "uvicorn"),
         ("pandas", "pandas"),

@@ -1,24 +1,26 @@
 """
 Chaîne RAG (Retrieval-Augmented Generation) pour Puls-Events.
 
-Assemble le pipeline complet : recherche vectorielle Faiss +
-génération de réponse via LLM Mistral orchestré par LangChain.
+Assemble le pipeline complet : recherche vectorielle + génération de
+réponse via LLM Mistral. Chaque question est tracée dans Langfuse
+(latence, tokens, coût) quand les clés Langfuse sont configurées.
 Expose une fonction `ask()` réutilisable par l'API et les tests.
 """
 
 import logging
 import os
-from pathlib import Path
+import time
+from dataclasses import dataclass
 
-from dotenv import load_dotenv
-from langchain_community.vectorstores import FAISS
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.documents import Document
+from langchain_core.messages import BaseMessage
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.vectorstores import VectorStore
 from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
+from langfuse import Langfuse
 
-# Charger les variables d'environnement
-load_dotenv()
+from scripts.config import Settings, get_mistral_api_key, get_settings, llm_cost_usd
+from scripts.vector_db import open_store
 
 # Configuration du logging
 logging.basicConfig(
@@ -26,16 +28,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-# Constantes
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-INDEX_DIR = DATA_DIR / "faiss_index"
-
-EMBEDDING_MODEL = "mistral-embed"
-LLM_MODEL = "mistral-small-latest"
-
-# Nombre de chunks à récupérer par requête
-TOP_K = 5
 
 # Prompt système pour guider le LLM
 SYSTEM_PROMPT = """\
@@ -57,143 +49,215 @@ Contexte (événements trouvés dans la base) :
 Question : {question}
 """
 
-
-def _get_api_key() -> str:
-    """Récupère la clé API Mistral depuis l'environnement.
-
-    Returns:
-        Clé API Mistral.
-
-    Raises:
-        ValueError: Si la clé n'est pas définie.
-    """
-    api_key = os.getenv("MISTRAL_API_KEY")
-    if not api_key:
-        msg = "MISTRAL_API_KEY non définie. Configurez-la dans le fichier .env"
-        raise ValueError(msg)
-    return api_key
+PROMPT = ChatPromptTemplate.from_messages(
+    [
+        ("system", SYSTEM_PROMPT),
+        ("human", USER_PROMPT),
+    ]
+)
 
 
-def load_vectorstore() -> FAISS:
-    """Charge l'index Faiss depuis le disque.
+@dataclass
+class RagResult:
+    """Résultat détaillé d'une question : réponse, sources et mesures."""
 
-    Returns:
-        Instance FAISS avec l'index vectoriel chargé.
+    answer: str
+    documents: list[Document]
+    input_tokens: int
+    output_tokens: int
+    cost_usd: float
+    embedding_seconds: float
+    search_seconds: float
+    generation_seconds: float
 
-    Raises:
-        FileNotFoundError: Si l'index n'existe pas.
-    """
-    if not INDEX_DIR.exists():
-        msg = (
-            f"Index Faiss introuvable dans {INDEX_DIR}. "
-            "Lancez d'abord : python scripts/build_index.py"
-        )
-        raise FileNotFoundError(msg)
+    @property
+    def total_seconds(self) -> float:
+        """Latence totale de la question, de l'embedding à la réponse."""
+        return self.embedding_seconds + self.search_seconds + self.generation_seconds
 
-    api_key = _get_api_key()
-    embeddings = MistralAIEmbeddings(model=EMBEDDING_MODEL, api_key=api_key)
-    vectorstore = FAISS.load_local(
-        str(INDEX_DIR),
-        embeddings,
-        allow_dangerous_deserialization=True,
+
+@dataclass
+class RagComponents:
+    """Objets coûteux à créer, construits une seule fois par processus."""
+
+    settings: Settings
+    embeddings: MistralAIEmbeddings
+    vectorstore: VectorStore
+    llm: ChatMistralAI
+
+
+def _tracing_configured() -> bool:
+    """Le traçage n'est actif que si les deux clés Langfuse sont fournies."""
+    return bool(os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"))
+
+
+# Sans clés, le client Langfuse ne fait rien : l'API fonctionne sans traçage.
+langfuse = Langfuse(tracing_enabled=_tracing_configured())
+
+
+def get_embeddings(settings: Settings) -> MistralAIEmbeddings:
+    """Initialise le modèle d'embeddings Mistral."""
+    return MistralAIEmbeddings(
+        model=settings.embedding_model,
+        api_key=get_mistral_api_key(),
     )
-    logger.info("Index Faiss chargé depuis %s", INDEX_DIR)
-    return vectorstore
 
 
-def _format_docs(docs: list) -> str:
-    """Formate les documents récupérés en texte pour le prompt.
-
-    Combine les chunks trouvés en un seul bloc de contexte,
-    séparé par des lignes de démarcation.
-
-    Args:
-        docs: Liste de Documents LangChain retournés par Faiss.
-
-    Returns:
-        Texte formaté avec tous les chunks pertinents.
-    """
+def _format_docs(docs: list[Document]) -> str:
+    """Formate les documents récupérés en un seul bloc de contexte."""
     formatted = []
     for i, doc in enumerate(docs, 1):
         formatted.append(f"--- Événement {i} ---\n{doc.page_content}")
     return "\n\n".join(formatted)
 
 
-def build_rag_chain():
-    """Construit la chaîne RAG complète avec LangChain.
+def build_components(vectorstore: VectorStore | None = None) -> RagComponents:
+    """Crée les embeddings, la base vectorielle et le LLM.
 
-    Assemble : Retriever Faiss → Prompt augmenté → LLM Mistral → Réponse texte.
+    Args:
+        vectorstore: Base à interroger. Par défaut, la table pgvector ;
+            l'évaluation peut fournir un index Faiss pour comparer.
 
-    Returns:
-        Tuple (chain, retriever) — la chaîne RAG et le retriever pour usage direct.
+    Raises:
+        VectorStoreUnavailableError: Si PostgreSQL ou la table sont absents.
     """
-    api_key = _get_api_key()
-
-    # Charger le vectorstore et créer le retriever
-    vectorstore = load_vectorstore()
-    retriever = vectorstore.as_retriever(search_kwargs={"k": TOP_K})
-
-    # Configurer le LLM Mistral
+    settings = get_settings()
+    embeddings = get_embeddings(settings)
+    if vectorstore is None:
+        vectorstore = open_store(settings, embeddings)
     llm = ChatMistralAI(
-        model=LLM_MODEL,
-        api_key=api_key,
-        temperature=0.3,
+        model=settings.llm_model,
+        api_key=get_mistral_api_key(),
+        temperature=settings.llm_temperature,
     )
-
-    # Construire le prompt template
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", SYSTEM_PROMPT),
-            ("human", USER_PROMPT),
-        ]
+    logger.info(
+        "Chaîne RAG prête (modèle: %s, top_k: %d)", settings.llm_model, settings.top_k
     )
-
-    # Assembler la chaîne RAG avec LCEL (LangChain Expression Language)
-    # 1. Le retriever cherche les chunks pertinents
-    # 2. Les chunks sont formatés en texte (context)
-    # 3. Le prompt injecte le contexte + la question
-    # 4. Le LLM génère la réponse
-    # 5. Le parser extrait le texte brut
-    chain = (
-        {
-            "context": retriever | _format_docs,
-            "question": RunnablePassthrough(),
-        }
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
-
-    logger.info("Chaîne RAG construite (modèle: %s, top_k: %d)", LLM_MODEL, TOP_K)
-    return chain, retriever
+    return RagComponents(settings, embeddings, vectorstore, llm)
 
 
 # Instance globale (chargée une seule fois)
-_chain = None
-_retriever = None
+_components: RagComponents | None = None
 
 
-def _get_chain():
-    """Retourne la chaîne RAG, en la construisant si nécessaire.
+def get_components() -> RagComponents:
+    """Retourne les composants RAG, en les construisant au premier appel."""
+    global _components  # noqa: PLW0603
+    if _components is None:
+        _components = build_components()
+    return _components
 
-    Utilise un singleton pour éviter de recharger l'index
-    à chaque appel.
+
+def reset_components() -> None:
+    """Oublie les composants chargés (après une reconstruction de l'index)."""
+    global _components  # noqa: PLW0603
+    _components = None
+
+
+def _retrieve(
+    components: RagComponents, question: str
+) -> tuple[list[Document], float, float]:
+    """Cherche les chunks proches de la question.
+
+    L'embedding de la question et la recherche vectorielle sont chronométrés
+    séparément : seule la recherche dépend de la base vectorielle.
 
     Returns:
-        Tuple (chain, retriever).
+        Tuple (documents, durée embedding, durée recherche) en secondes.
     """
-    global _chain, _retriever  # noqa: PLW0603
-    if _chain is None:
-        _chain, _retriever = build_rag_chain()
-    return _chain, _retriever
+    start = time.perf_counter()
+    query_vector = components.embeddings.embed_query(question)
+    embedding_seconds = time.perf_counter() - start
+
+    start = time.perf_counter()
+    documents = components.vectorstore.similarity_search_by_vector(
+        query_vector, k=components.settings.top_k
+    )
+    search_seconds = time.perf_counter() - start
+    return documents, embedding_seconds, search_seconds
+
+
+def _generate(
+    components: RagComponents, messages: list[BaseMessage]
+) -> tuple[str, int, int]:
+    """Appelle le LLM et renvoie (réponse, tokens d'entrée, tokens de sortie)."""
+    response = components.llm.invoke(messages)
+    usage = response.usage_metadata or {}
+    return (
+        str(response.content),
+        usage.get("input_tokens", 0),
+        usage.get("output_tokens", 0),
+    )
+
+
+def answer_question(
+    question: str, components: RagComponents | None = None
+) -> RagResult:
+    """Répond à une question et mesure latence, tokens et coût.
+
+    Chaque étape est enregistrée dans Langfuse comme une observation
+    rattachée à la trace de la question.
+    """
+    if components is None:
+        components = get_components()
+    settings = components.settings
+
+    with langfuse.start_as_current_observation(
+        name="ask", as_type="span", input={"question": question}
+    ) as trace_span:
+        with langfuse.start_as_current_observation(
+            name="retrieval", as_type="retriever", input={"question": question}
+        ) as retrieval_span:
+            documents, embedding_seconds, search_seconds = _retrieve(
+                components, question
+            )
+            retrieval_span.update(
+                output=[doc.metadata.get("title", "") for doc in documents],
+                metadata={
+                    "top_k": settings.top_k,
+                    "embedding_seconds": embedding_seconds,
+                    "search_seconds": search_seconds,
+                },
+            )
+
+        messages = PROMPT.format_messages(
+            context=_format_docs(documents), question=question
+        )
+        with langfuse.start_as_current_observation(
+            name="mistral-chat",
+            as_type="generation",
+            model=settings.llm_model,
+            model_parameters={"temperature": settings.llm_temperature},
+            input=[{"role": m.type, "content": m.content} for m in messages],
+        ) as generation:
+            start = time.perf_counter()
+            answer, input_tokens, output_tokens = _generate(components, messages)
+            generation_seconds = time.perf_counter() - start
+
+            input_cost = llm_cost_usd(settings, input_tokens, 0)
+            output_cost = llm_cost_usd(settings, 0, output_tokens)
+            generation.update(
+                output=answer,
+                usage_details={"input": input_tokens, "output": output_tokens},
+                cost_details={"input": input_cost, "output": output_cost},
+            )
+
+        trace_span.update(output={"answer": answer})
+
+    return RagResult(
+        answer=answer,
+        documents=documents,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=input_cost + output_cost,
+        embedding_seconds=embedding_seconds,
+        search_seconds=search_seconds,
+        generation_seconds=generation_seconds,
+    )
 
 
 def ask(question: str) -> dict:
     """Pose une question au chatbot RAG.
-
-    C'est la fonction principale du système. Elle prend une question
-    en langage naturel et retourne une réponse basée sur les
-    événements culturels indexés.
 
     Args:
         question: Question de l'utilisateur en français.
@@ -203,17 +267,9 @@ def ask(question: str) -> dict:
         - "answer": la réponse générée par le LLM
         - "sources": les chunks utilisés comme contexte
     """
-    chain, retriever = _get_chain()
-
     logger.info("Question reçue : '%s'", question)
+    result = answer_question(question)
 
-    # Récupérer les chunks pertinents (pour les retourner comme sources)
-    source_docs = retriever.invoke(question)
-
-    # Générer la réponse via la chaîne RAG
-    answer = chain.invoke(question)
-
-    # Construire les sources pour la traçabilité
     sources = [
         {
             "title": doc.metadata.get("title", ""),
@@ -223,23 +279,25 @@ def ask(question: str) -> dict:
             "url": doc.metadata.get("url", ""),
             "excerpt": doc.page_content[:200],
         }
-        for doc in source_docs
+        for doc in result.documents
     ]
 
     logger.info(
-        "Réponse générée (%d caractères, %d sources)", len(answer), len(sources)
+        "Réponse générée (%d caractères, %d sources, %.2fs, %.6f $)",
+        len(result.answer),
+        len(sources),
+        result.total_seconds,
+        result.cost_usd,
     )
-    return {"answer": answer, "sources": sources}
+    return {"answer": result.answer, "sources": sources}
 
 
 def main():
     """Point d'entrée : test interactif du chatbot RAG."""
     print("=" * 60)
     print("Chatbot Puls-Events — RAG (Île-de-France)")
-    print("Tapez 'quit' pour quitter.")
     print("=" * 60)
 
-    # Test automatique avec quelques questions
     test_questions = [
         "Quels concerts sont prévus à Paris prochainement ?",
         "Y a-t-il des expositions à Versailles ?",
@@ -256,6 +314,8 @@ def main():
         print(f"\nSources ({len(result['sources'])}) :")
         for src in result["sources"]:
             print(f"  • {src['title']} ({src['city']}) — {src['url']}")
+
+    langfuse.flush()
 
 
 if __name__ == "__main__":
