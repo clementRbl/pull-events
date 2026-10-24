@@ -33,6 +33,7 @@ from scripts.rag_chain import (
     answer_question,
     build_components,
     get_embeddings,
+    get_mistral_embeddings,
     langfuse,
 )
 
@@ -45,6 +46,15 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 TEST_FILE = PROJECT_ROOT / "data" / "test_questions.json"
 RESULTS_DIR = PROJECT_ROOT / "docs" / "evaluation"
+
+# Embeddings utilisés par la métrique answer_relevancy. Ils font partie du
+# juge : on les garde fixes quel que soit le fournisseur évalué, sinon les
+# scores de deux configurations ne seraient pas comparables.
+JUDGE_EMBEDDING_MODEL = "mistral-embed"
+
+# Coût du juge mesuré dans Langfuse le 24/10/2026 avec claude-haiku-5-5 :
+# environ 0,12 $ pour 20 questions. Sert à prévenir avant de lancer le juge.
+JUDGE_COST_PER_QUESTION_USD = 0.006
 
 RAGAS_METRICS = [
     "faithfulness",
@@ -107,11 +117,24 @@ def build_judge(settings: Settings) -> LangchainLLMWrapper:
     )
 
 
+def estimate_judge_cost_usd(question_count: int) -> float:
+    """Estime le coût du juge (Ragas fait plusieurs appels par question)."""
+    return question_count * JUDGE_COST_PER_QUESTION_USD
+
+
 def evaluate_with_ragas(results: list[tuple[dict, RagResult]]) -> list[dict]:
     """Évalue les réponses avec Ragas et retourne les scores par question."""
     settings = get_settings()
+    logger.info(
+        "Juge %s sur %d questions : coût estimé ~%.2f $",
+        settings.judge_model,
+        len(results),
+        estimate_judge_cost_usd(len(results)),
+    )
     evaluator_llm = build_judge(settings)
-    evaluator_embeddings = LangchainEmbeddingsWrapper(get_embeddings(settings))
+    evaluator_embeddings = LangchainEmbeddingsWrapper(
+        get_mistral_embeddings(JUDGE_EMBEDDING_MODEL, settings.llm_timeout_seconds)
+    )
 
     samples = [
         SingleTurnSample(
@@ -209,6 +232,7 @@ def save_results(
     report = {
         "label": label,
         "backend": backend,
+        "llm_provider": settings.llm_provider,
         "llm_model": settings.llm_model,
         "judge_model": settings.judge_model,
         "embedding_model": settings.embedding_model,
@@ -222,6 +246,7 @@ def save_results(
     output_file = RESULTS_DIR / f"results_{label}.json"
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
+        f.write("\n")
     return output_file
 
 
@@ -239,10 +264,16 @@ def main():
         default="pgvector",
         help="Base vectorielle évaluée",
     )
+    parser.add_argument(
+        "--max-questions",
+        type=int,
+        default=20,
+        help="Nombre maximum de questions évaluées (le juge est facturé par question)",
+    )
     args = parser.parse_args()
 
-    test_set = load_test_set()
-    logger.info("%d questions chargées", len(test_set))
+    test_set = load_test_set()[: args.max_questions]
+    logger.info("%d questions retenues", len(test_set))
 
     # Base chargée avant les questions, pour ne pas chronométrer le démarrage
     components = load_components(args.backend)

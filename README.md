@@ -4,19 +4,22 @@ Chatbot **RAG** (Retrieval-Augmented Generation) qui recommande des événements
 
 La version 1.1 remplace l'index Faiss par **PostgreSQL + pgvector** et ajoute **Langfuse** : chaque question est tracée avec sa latence, ses tokens et son coût.
 
+La version 1.2 tourne aussi sur **Azure** : Container Apps, Azure OpenAI (Foundry), PostgreSQL Flexible Server + pgvector, Key Vault. Voir [docs/azure/deploiement.md](docs/azure/deploiement.md).
+
 ## Stack technique
 
 | Composant | Technologie |
 |-----------|------------|
 | Orchestrateur RAG | LangChain |
-| LLM et embeddings | Mistral (`ministral-8b-latest`, `mistral-embed`) |
+| LLM et embeddings | Mistral (`ministral-8b-latest`, `mistral-embed`) en local ; Azure OpenAI (`gpt-4.1-mini`, `text-embedding-3-small`) sur Azure |
 | Base vectorielle | PostgreSQL 17 + pgvector (index HNSW, distance cosinus) |
-| Observabilité LLM | Langfuse v4 auto-hébergé |
+| Observabilité LLM | Langfuse v4 (auto-hébergé en local, Langfuse Cloud UE pour Azure) |
 | API REST | FastAPI |
 | Évaluation | Ragas (20 questions annotées), juge Claude Haiku 5.5 |
 | Source de données | API Open Agenda (OpenDataSoft) |
 | Dépendances | uv (`pyproject.toml` + `uv.lock`) |
-| Conteneurisation | Docker Compose |
+| Conteneurisation | Docker Compose ; image publiée sur GHCR |
+| Cloud | Azure Container Apps, Azure OpenAI (Foundry), PostgreSQL Flexible Server, Key Vault |
 
 ## Architecture du système
 
@@ -118,15 +121,21 @@ Tout ce qui change d'un environnement à l'autre passe par des variables d'envir
 
 | Variable | Défaut | Rôle |
 |----------|--------|------|
-| `MISTRAL_API_KEY` | — | Clé API Mistral (obligatoire) |
+| `LLM_PROVIDER` | `mistral` | Fournisseur du LLM et des embeddings : `mistral` ou `azure_openai` |
+| `MISTRAL_API_KEY` | — | Clé API Mistral (obligatoire avec `mistral`) |
+| `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_API_VERSION` | — / — / `2024-10-21` | Accès Azure OpenAI. `LLM_MODEL` et `EMBEDDING_MODEL` désignent alors les noms des déploiements |
 | `DATABASE_URL` | `postgresql+psycopg://pullevents:pullevents@localhost:5432/pullevents` | Base pgvector |
 | `VECTOR_TABLE` | `event_chunks` | Table des chunks |
-| `LLM_MODEL` / `EMBEDDING_MODEL` | `ministral-8b-latest` / `mistral-embed` | Modèles |
+| `LLM_MODEL` / `EMBEDDING_MODEL` / `EMBEDDING_SIZE` | `ministral-8b-latest` / `mistral-embed` / `1024` | Modèles (changer d'embeddings impose de réindexer) |
 | `TOP_K` | `5` | Nombre de chunks envoyés au LLM |
 | `HNSW_EF_SEARCH` | `100` | Candidats explorés par l'index HNSW (rappel@5 : 0,91 à 40, 0,99 à 100) |
 | `LLM_INPUT_PRICE_PER_MTOK` / `LLM_OUTPUT_PRICE_PER_MTOK` | `0.10` / `0.10` | Prix ($ par million de tokens) pour le coût par réponse |
 | `JUDGE_PROVIDER` / `JUDGE_MODEL` / `ANTHROPIC_API_KEY` | `anthropic` / `claude-haiku-5-5` | Juge de l'évaluation Ragas (dev uniquement) |
 | `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_BASE_URL` | clés du Langfuse local | Traçage. Sans clés, l'API marche mais ne trace rien |
+| `API_KEY` | — | Si définie, `/ask` et `/rebuild` exigent l'en-tête `X-API-Key`. Sans elle, l'API est ouverte (avertissement au démarrage) |
+| `ENABLE_REBUILD` | `false` | `true` autorise `/rebuild` (poste local) |
+| `LLM_MAX_TOKENS` / `LLM_TIMEOUT_SECONDS` | `1024` / `60` | Plafonds par réponse (tokens générés, délai d'attente du LLM et des embeddings) |
+| `LANGFUSE_TRACE_CONTENT` | `true` | `false` masque questions, prompts et réponses dans Langfuse ; tokens, coûts et latences restent |
 
 ## Base vectorielle : PostgreSQL + pgvector
 
@@ -152,10 +161,12 @@ Chaque appel à `/ask` produit une trace dans Langfuse :
 ```
 ask (span)
 ├── retrieval (retriever)   -- titres des chunks, durée embedding / recherche
-└── mistral-chat (generation)  -- prompt, réponse, tokens entrée/sortie, coût en $
+└── llm-chat (generation)   -- prompt, réponse, tokens entrée/sortie, coût en $
 ```
 
-Le coût est calculé dans l'application à partir des tokens renvoyés par Mistral et des prix configurés, puis envoyé à Langfuse (`cost_details`). L'évaluation et Langfuse utilisent donc la même grille de prix.
+Le coût est calculé dans l'application à partir des tokens renvoyés par le LLM et des prix configurés, puis envoyé à Langfuse (`cost_details`). L'évaluation et Langfuse utilisent donc la même grille de prix.
+
+**Les questions des utilisateurs sont tracées** dans Langfuse, avec les prompts et les réponses. `LANGFUSE_TRACE_CONTENT=false` remplace tous les textes par `[masqué]` (paramètre `mask` du client Langfuse) et ne garde que les mesures. Les journaux de l'API n'affichent plus les questions (niveau DEBUG).
 
 ## Endpoints
 
@@ -163,7 +174,7 @@ Le coût est calculé dans l'application à partir des tokens renvoyés par Mist
 |---------|----------|-------------|
 | GET | `/health` | Vérifier l'état de l'API |
 | POST | `/ask` | Poser une question au chatbot |
-| POST | `/rebuild` | Reconstruire l'index vectoriel (sans coupure de service) |
+| POST | `/rebuild` | Reconstruire l'index vectoriel (sans coupure de service). Désactivé par défaut |
 
 ```bash
 curl -X POST http://localhost:8000/ask \
@@ -187,7 +198,11 @@ curl -X POST http://localhost:8000/ask \
 }
 ```
 
-Codes d'erreur : `422` question invalide, `503` base vectorielle indisponible, `500` configuration manquante.
+Codes d'erreur : `401` clé d'API absente ou fausse (si `API_KEY` est définie), `403` reconstruction désactivée, `409` reconstruction déjà en cours, `422` question invalide, `429` limite de débit dépassée, `503` base vectorielle indisponible, `500` configuration manquante. Les messages d'erreur restent génériques : le détail est dans les journaux du serveur.
+
+Limites de débit (`slowapi`, en mémoire) : 10 questions par minute et par IP, 30 par minute et par clé d'API, une reconstruction par jour. En local, l'API n'écoute que sur `127.0.0.1` (`launch.sh` et Docker Compose).
+
+Sur Azure, ajouter l'en-tête `X-API-Key` (la clé est dans le Key Vault, voir [docs/azure/deploiement.md](docs/azure/deploiement.md#appeler-lapi)).
 
 ## Tests
 
@@ -195,9 +210,9 @@ Codes d'erreur : `422` question invalide, `503` base vectorielle indisponible, `
 uv run pytest -v
 ```
 
-- `tests/test_api.py` : endpoints, erreurs, Swagger
+- `tests/test_api.py` : endpoints, erreurs génériques, Swagger, clé d'API, limite de débit, `/rebuild` désactivé par défaut et verrouillé
 - `tests/test_scripts.py` : nettoyage, chunking, ingestion
-- `tests/test_rag.py` : configuration par variables d'environnement, calcul du coût, chaîne RAG instrumentée (Mistral simulé), échange de tables pgvector sur une vraie base (ignoré si `docker compose up -d db` n'est pas lancé)
+- `tests/test_rag.py` : configuration par variables d'environnement, choix du fournisseur (Mistral ou Azure OpenAI), calcul du coût, chaîne RAG instrumentée (LLM simulé), échange de tables pgvector sur une vraie base (ignoré si `docker compose up -d db` n'est pas lancé)
 
 ## Évaluation : qualité et coûts
 
@@ -205,7 +220,7 @@ uv run pytest -v
 uv run python -m scripts.evaluate_rag --backend pgvector
 ```
 
-Le script pose les 20 questions de `data/test_questions.json`, puis les fait noter par un juge d'un autre fournisseur (Claude Haiku 5.5, pour qu'un modèle ne note pas ses propres réponses). Il calcule :
+Le script pose les 20 questions de `data/test_questions.json` (`--max-questions` pour en prendre moins), puis les fait noter par un juge d'un autre fournisseur (Claude Haiku 5.5, pour qu'un modèle ne note pas ses propres réponses). Il affiche une estimation du coût du juge avant de le lancer (environ 0,006 $ par question). Les embeddings du juge restent `mistral-embed` quel que soit le fournisseur évalué, pour que les scores restent comparables. Il calcule :
 
 | Métrique | Ce qu'elle mesure |
 |----------|------------------|
@@ -219,22 +234,25 @@ Le résumé et le détail par question sont écrits dans `docs/evaluation/result
 
 ### Résultats avant/après
 
-Mêmes 39 089 vecteurs dans les deux bases, même LLM (`ministral-8b-latest`), même juge. Détail, méthode et limites : [docs/evaluation/README.md](docs/evaluation/README.md).
+Même jeu de 20 questions et même juge partout. Les trois premières colonnes et la colonne A utilisent les mêmes vecteurs Mistral ; la colonne B réindexe tout avec Azure OpenAI. Détail, méthode et limites : [docs/evaluation/README.md](docs/evaluation/README.md).
 
-| | Faiss (v1) | pgvector, `ef_search=40` | pgvector, `ef_search=100` |
-|---|---|---|---|
-| Faithfulness | 0,871 | 0,843 | 0,884 |
-| Answer relevancy | 0,826 | 0,837 | 0,831 |
-| Context precision | 0,582 | 0,518 | 0,518 |
-| Mêmes 5 sources que Faiss | — | 16 / 20 | 18 / 20 |
-| Recherche vectorielle | 14,8 ms | 4,3 ms | 5,6 ms |
-| Latence totale (moyenne / p95) | 4,31 s / 8,18 s | 3,06 s / 4,38 s | 3,47 s / 6,16 s |
-| Coût LLM pour 1 000 questions | 0,17 $ | 0,17 $ | 0,17 $ |
+| | Faiss (v1) | pgvector, `ef_search=40` | pgvector, `ef_search=100` | Azure A : Mistral | Azure B : Azure OpenAI |
+|---|---|---|---|---|---|
+| Faithfulness | 0,871 | 0,843 | 0,884 | 0,878 | **0,932** |
+| Answer relevancy | 0,826 | 0,837 | 0,831 | 0,843 | **0,878** |
+| Context precision | 0,582 | 0,518 | 0,518 | 0,527 | **0,707** |
+| Mêmes 5 sources que Faiss | — | 16 / 20 | 18 / 20 | 18 / 20 | 0 / 20 |
+| Recherche vectorielle (moyenne) | 14,8 ms | 4,3 ms | 5,6 ms | 832 ms | 206 ms |
+| Latence totale (moyenne / p95) | 4,31 s / 8,18 s | 3,06 s / 4,38 s | 3,47 s / 6,16 s | 3,89 s / 7,08 s | 2,87 s / 4,49 s |
+| Coût LLM pour 1 000 questions | 0,17 $ | 0,17 $ | 0,17 $ | 0,18 $ | 1,24 $ |
 
 En résumé :
-- **Qualité inchangée** : les écarts restent dans le bruit du juge, mesuré sur les questions où les chunks récupérés étaient identiques (± 0,06 en faithfulness).
-- **Le coût ne dépend pas de la base** : 0,17 $ pour 1 000 questions, fixé par le LLM et le nombre de tokens.
-- **Le vrai réglage est `ef_search`** : à 40 (défaut pgvector), l'index HNSW rate 9 % des plus proches voisins ; à 100, 1 % pour 0,4 ms de plus.
+- **Faiss → pgvector : qualité inchangée** : les écarts restent dans le bruit du juge, mesuré sur les questions où les chunks récupérés étaient identiques (± 0,06 en faithfulness).
+- **Le vrai réglage pgvector est `ef_search`** : à 40 (défaut pgvector), l'index HNSW rate 9 % des plus proches voisins ; à 100, 1 % pour 0,4 ms de plus.
+- **Local → Azure : l'infrastructure seule ne change rien** (colonne A) : mêmes sources pour les 20 questions, scores dans le bruit.
+- **Azure OpenAI améliore les trois scores** (colonne B), surtout la précision du contexte (+0,18), pour un coût 7 fois plus élevé (1,24 $ pour 1 000 questions).
+- **L'API déployée répond en 2,6 s en moyenne** (p95 4,2 s), mesuré en HTTP depuis Paris sur les 20 questions.
+- **Le serveur PostgreSQL B1ms est trop petit pour garder les index en mémoire** : la recherche passe de 5 ms à plusieurs centaines de millisecondes, encore loin derrière les 2,6 s de génération.
 - **Évaluer coûte plus cher que répondre** : environ 0,12 $ de juge par évaluation, contre 0,0034 $ pour les 20 réponses.
 
 ## Pipeline de données
@@ -260,6 +278,8 @@ uv run python -m scripts.evaluate_rag --backend faiss
 - **Pas d'historique de conversation** : chaque question est indépendante.
 - **Jeu d'évaluation réduit** : 20 questions, avec des références génériques. Assez pour comparer deux versions, pas pour une mesure absolue.
 - **Prix** : les tarifs Mistral par défaut sont à vérifier sur la page officielle et à ajuster dans `.env`.
+- **Limite de débit en mémoire** : valable avec un seul réplica (c'est le cas sur Azure, 0 à 1). Au-delà, il faudrait un stockage partagé (Redis).
+- **`/rebuild` synchrone** : la requête attend la fin du pipeline. Un traitement en tâche de fond (202 puis suivi) serait plus propre ; la route est de toute façon désactivée hors poste local.
 - **Chunks longs** : les descriptions sont découpées par ligne, et le HTML nettoyé n'en contient presque plus. Certains chunks font donc près de 10 000 caractères (4 800 tokens au plus après normalisation Unicode).
 
 ## Structure du projet
@@ -280,6 +300,7 @@ pull-events/
 ├── tests/                     # pytest
 ├── data/test_questions.json   # Jeu de test annoté (20 questions)
 ├── docs/
+│   ├── azure/                 # Ressources Azure, commandes, coût, destruction ; fiche AI-103
 │   ├── evaluation/            # Méthode, résultats avant/après (JSON par configuration)
 │   ├── article-blog.md        # Brouillon d'article
 │   └── architecture.mmd

@@ -44,7 +44,7 @@ docker compose up -d --wait db langfuse-web langfuse-worker
 if [ "$1" = "--api" ]; then
     echo ""
     echo -e "${GREEN}Démarrage de l'API (index existant)...${NC}"
-    uv run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+    uv run uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
     exit 0
 fi
 
@@ -68,4 +68,4 @@ echo "--- Démarrage de l'API ---"
 echo "Swagger  : http://localhost:8000/docs"
 echo "Langfuse : http://localhost:3000"
 echo ""
-uv run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn api.main:app --reload --host 127.0.0.1 --port 8000

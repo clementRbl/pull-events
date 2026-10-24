@@ -2,8 +2,9 @@
 Construction de l'index vectoriel dans PostgreSQL + pgvector.
 
 Charge les chunks textuels préparés, les vectorise avec les embeddings
-Mistral et les écrit dans une table de travail. La table n'est mise en
-service qu'une fois complète et indexée (HNSW).
+du fournisseur configuré (Mistral ou Azure OpenAI) et les écrit dans une
+table de travail. La table n'est mise en service qu'une fois complète et
+indexée (HNSW).
 
 Usage :
     uv run python -m scripts.build_index
@@ -128,7 +129,7 @@ def _retry_with_backoff(func, *args, **kwargs):
 def index_documents(store: PGVectorStore, documents: list[Document]) -> None:
     """Vectorise et insère les documents par lots dans la table de travail.
 
-    Gère le rate-limiting de l'API Mistral avec retry et délai entre les lots.
+    Gère le rate-limiting de l'API d'embeddings avec retry et délai entre les lots.
     """
     total_batches = (len(documents) + BATCH_SIZE - 1) // BATCH_SIZE
     logger.info(

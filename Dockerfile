@@ -19,5 +19,7 @@ COPY scripts/ scripts/
 # Port de l'API
 EXPOSE 8000
 
-# Lancer l'API
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Lancer l'API. --proxy-headers : derrière l'ingress Azure, l'IP du client
+# (utilisée par la limite de débit) vient de l'en-tête X-Forwarded-For.
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", \
+     "--proxy-headers", "--forwarded-allow-ips", "*"]

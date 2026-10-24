@@ -5,9 +5,18 @@ from unittest.mock import MagicMock, patch
 import pytest
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage
+from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 
 from scripts.config import get_settings, llm_cost_usd
-from scripts.rag_chain import RagComponents, answer_question, ask
+from scripts.rag_chain import (
+    MASKED_TEXT,
+    RagComponents,
+    answer_question,
+    ask,
+    get_embeddings,
+    get_llm,
+    mask_text_content,
+)
 
 # === Configuration par variables d'environnement ===
 
@@ -41,6 +50,44 @@ def test_settings_reject_unknown_judge_provider():
             get_settings()
 
 
+def test_settings_reject_unknown_llm_provider():
+    """Un fournisseur de LLM inconnu est refusé dès la configuration."""
+    with patch.dict("os.environ", {"LLM_PROVIDER": "openai"}):
+        with pytest.raises(ValueError, match="LLM_PROVIDER"):
+            get_settings()
+
+
+def test_azure_provider_requires_endpoint_and_key(monkeypatch):
+    """Azure OpenAI sans point de terminaison : erreur claire, pas d'appel réseau."""
+    monkeypatch.setenv("LLM_PROVIDER", "azure_openai")
+    monkeypatch.delenv("AZURE_OPENAI_ENDPOINT", raising=False)
+    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
+
+    with pytest.raises(ValueError, match="AZURE_OPENAI_ENDPOINT"):
+        get_llm(get_settings())
+
+
+def test_azure_provider_uses_deployment_names(monkeypatch):
+    """Sur Azure, LLM_MODEL et EMBEDDING_MODEL désignent les déploiements."""
+    monkeypatch.setenv("LLM_PROVIDER", "azure_openai")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://exemple.openai.azure.com/")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "cle-de-test")
+    monkeypatch.setenv("LLM_MODEL", "gpt-4.1-mini")
+    monkeypatch.setenv("EMBEDDING_MODEL", "text-embedding-3-small")
+    settings = get_settings()
+
+    llm = get_llm(settings)
+    embeddings = get_embeddings(settings)
+
+    assert isinstance(llm, AzureChatOpenAI)
+    assert llm.deployment_name == "gpt-4.1-mini"
+    # Plafonds par défaut : une réponse ne peut ni s'emballer ni bloquer
+    assert llm.max_tokens == 1024
+    assert llm.request_timeout == 60.0
+    assert isinstance(embeddings, AzureOpenAIEmbeddings)
+    assert embeddings.deployment == "text-embedding-3-small"
+
+
 def test_llm_cost_uses_configured_prices():
     """Le coût suit les prix par million de tokens configurés."""
     env = {"LLM_INPUT_PRICE_PER_MTOK": "1.0", "LLM_OUTPUT_PRICE_PER_MTOK": "3.0"}
@@ -49,6 +96,25 @@ def test_llm_cost_uses_configured_prices():
 
     cost = llm_cost_usd(settings, input_tokens=2_000, output_tokens=500)
     assert cost == pytest.approx(0.002 + 0.0015)
+
+
+def test_langfuse_mask_hides_text_but_keeps_measures():
+    """Masquage Langfuse : questions et réponses cachées, mesures conservées."""
+    trace = {
+        "question": "Mon adresse est 3 rue X",
+        "messages": [{"role": "human", "content": "Bonjour"}],
+        "top_k": 5,
+        "search_seconds": 0.004,
+    }
+
+    masked = mask_text_content(data=trace)
+
+    assert masked == {
+        "question": MASKED_TEXT,
+        "messages": [{"role": MASKED_TEXT, "content": MASKED_TEXT}],
+        "top_k": 5,
+        "search_seconds": 0.004,
+    }
 
 
 # === Chaîne RAG (Mistral et base vectorielle simulés) ===

@@ -58,14 +58,36 @@ services:
   api:
     build: .
     restart: unless-stopped
-    env_file: .env
+    # Liste blanche : seules ces variables de .env entrent dans le conteneur
+    # (la clé Anthropic du juge, par exemple, n'a rien à y faire).
+    # Une variable listée sans valeur est lue dans .env, ou absente.
     environment:
-      DATABASE_URL: postgresql+psycopg://pullevents:${POSTGRES_PASSWORD:-pullevents}@db:5432/pullevents
-      LANGFUSE_BASE_URL: http://langfuse-web:3000
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-local-dev}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-local-dev}
+      - DATABASE_URL=postgresql+psycopg://pullevents:${POSTGRES_PASSWORD:-pullevents}@db:5432/pullevents
+      - LANGFUSE_BASE_URL=http://langfuse-web:3000
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-pk-lf-local-dev}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-sk-lf-local-dev}
+      - LANGFUSE_TRACE_CONTENT
+      - LLM_PROVIDER
+      - MISTRAL_API_KEY
+      - AZURE_OPENAI_ENDPOINT
+      - AZURE_OPENAI_API_KEY
+      - AZURE_OPENAI_API_VERSION
+      - LLM_MODEL
+      - LLM_TEMPERATURE
+      - LLM_MAX_TOKENS
+      - LLM_TIMEOUT_SECONDS
+      - EMBEDDING_MODEL
+      - EMBEDDING_SIZE
+      - TOP_K
+      - VECTOR_TABLE
+      - HNSW_EF_SEARCH
+      - LLM_INPUT_PRICE_PER_MTOK
+      - LLM_OUTPUT_PRICE_PER_MTOK
+      - EMBEDDING_PRICE_PER_MTOK
+      - API_KEY
+      - ENABLE_REBUILD
     ports:
-      - 8000:8000
+      - 127.0.0.1:8000:8000
     volumes:
       - ./data:/app/data
     depends_on:
