@@ -1,0 +1,16 @@
+# Émetteur Let's Encrypt (production) : validation HTTP-01 via ingress-nginx.
+# Ressource de cluster, hors du chart (elle ne dépend pas d'une release).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: clement.rbl@gmail.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx

@@ -1,0 +1,22 @@
+# Cluster kind local : un nœud, ports 80/443 de la machine redirigés vers
+# le contrôleur d'ingress (étiquette ingress-ready, attendue par ingress-nginx).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: pull-events
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        # Écoute sur la machine locale seulement : sans cela, Docker publie le port sur
+        # toutes les interfaces (tout le réseau local) en contournant ufw.
+        listenAddress: "127.0.0.1"
+      - containerPort: 443
+        hostPort: 443
+        listenAddress: "127.0.0.1"

@@ -36,10 +36,13 @@ class Settings:
 
     database_url: str
     vector_table: str
+    llm_provider: str
     embedding_model: str
     embedding_size: int
     llm_model: str
     llm_temperature: float
+    llm_max_tokens: int
+    llm_timeout_seconds: float
     top_k: int
     hnsw_ef_search: int
     judge_provider: str
@@ -56,6 +59,10 @@ def get_settings() -> Settings:
         ValueError: Si VECTOR_TABLE n'est pas un nom de table simple.
     """
     vector_table = os.getenv("VECTOR_TABLE", "event_chunks")
+    llm_provider = os.getenv("LLM_PROVIDER", "mistral")
+    if llm_provider not in ("mistral", "azure_openai"):
+        msg = f"LLM_PROVIDER doit valoir mistral ou azure_openai : {llm_provider!r}"
+        raise ValueError(msg)
     judge_provider = os.getenv("JUDGE_PROVIDER", "anthropic")
     if judge_provider not in ("anthropic", "mistral"):
         msg = f"JUDGE_PROVIDER doit valoir anthropic ou mistral : {judge_provider!r}"
@@ -69,10 +76,15 @@ def get_settings() -> Settings:
     return Settings(
         database_url=os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL),
         vector_table=vector_table,
+        llm_provider=llm_provider,
         embedding_model=os.getenv("EMBEDDING_MODEL", "mistral-embed"),
         embedding_size=int(os.getenv("EMBEDDING_SIZE", "1024")),
         llm_model=os.getenv("LLM_MODEL", "ministral-8b-latest"),
         llm_temperature=_float_env("LLM_TEMPERATURE", 0.3),
+        # Plafonds : une réponse ne peut pas consommer plus de tokens ni
+        # bloquer un worker plus longtemps que ça (réponses mesurées : ~350 tokens).
+        llm_max_tokens=int(os.getenv("LLM_MAX_TOKENS", "1024")),
+        llm_timeout_seconds=_float_env("LLM_TIMEOUT_SECONDS", 60.0),
         top_k=int(os.getenv("TOP_K", "5")),
         # 40 (défaut pgvector) : rappel@5 mesuré à 0,91 ; 100 : 0,99 pour +0,4 ms
         hnsw_ef_search=int(os.getenv("HNSW_EF_SEARCH", "100")),
@@ -95,6 +107,42 @@ def get_mistral_api_key() -> str:
         msg = "MISTRAL_API_KEY non définie. Configurez-la dans le fichier .env"
         raise ValueError(msg)
     return api_key
+
+
+@dataclass(frozen=True)
+class AzureOpenAISettings:
+    """Accès à Azure OpenAI : un point de terminaison et, au choix, une clé.
+
+    Sur Azure, on n'appelle pas un modèle par son nom mais un *déploiement*
+    (une instance du modèle créée dans la ressource, avec son propre quota).
+    LLM_MODEL et EMBEDDING_MODEL contiennent alors les noms des déploiements.
+
+    Sans clé (``api_key`` à None), l'application s'authentifie par son
+    identité Entra ID : identité managée de la Container App sur Azure,
+    compte ``az login`` sur le poste.
+    """
+
+    endpoint: str
+    api_key: str | None
+    api_version: str
+
+
+def get_azure_openai_settings() -> AzureOpenAISettings:
+    """Lit la configuration Azure OpenAI depuis l'environnement.
+
+    Raises:
+        ValueError: Si le point de terminaison n'est pas défini.
+    """
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    if not endpoint:
+        msg = "AZURE_OPENAI_ENDPOINT doit être définie quand LLM_PROVIDER=azure_openai"
+        raise ValueError(msg)
+    return AzureOpenAISettings(
+        endpoint=endpoint,
+        # Une clé vide compte comme absente : identité managée.
+        api_key=os.getenv("AZURE_OPENAI_API_KEY") or None,
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21"),
+    )
 
 
 def llm_cost_usd(settings: Settings, input_tokens: int, output_tokens: int) -> float:

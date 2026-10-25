@@ -2,24 +2,38 @@
 Chaîne RAG (Retrieval-Augmented Generation) pour Puls-Events.
 
 Assemble le pipeline complet : recherche vectorielle + génération de
-réponse via LLM Mistral. Chaque question est tracée dans Langfuse
-(latence, tokens, coût) quand les clés Langfuse sont configurées.
+réponse via un LLM (Mistral, ou Azure OpenAI selon LLM_PROVIDER). Chaque
+question est tracée dans Langfuse (latence, tokens, coût) quand les clés
+Langfuse sont configurées.
 Expose une fonction `ask()` réutilisable par l'API et les tests.
 """
 
 import logging
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.vectorstores import VectorStore
 from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
+from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from langfuse import Langfuse
 
-from scripts.config import Settings, get_mistral_api_key, get_settings, llm_cost_usd
+from scripts.config import (
+    AzureOpenAISettings,
+    Settings,
+    get_azure_openai_settings,
+    get_mistral_api_key,
+    get_settings,
+    llm_cost_usd,
+)
 from scripts.vector_db import open_store
 
 # Configuration du logging
@@ -81,9 +95,9 @@ class RagComponents:
     """Objets coûteux à créer, construits une seule fois par processus."""
 
     settings: Settings
-    embeddings: MistralAIEmbeddings
+    embeddings: Embeddings
     vectorstore: VectorStore
-    llm: ChatMistralAI
+    llm: BaseChatModel
 
 
 def _tracing_configured() -> bool:
@@ -91,15 +105,103 @@ def _tracing_configured() -> bool:
     return bool(os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"))
 
 
+MASKED_TEXT = "[masqué]"
+
+
+# Any : signature imposée par le client Langfuse (MaskFunction), qui
+# transmet n'importe quelle donnée sérialisable en JSON.
+def mask_text_content(*, data: Any, **kwargs: Any) -> Any:
+    """Remplace tout texte envoyé à Langfuse, en gardant les nombres.
+
+    Questions, prompts et réponses disparaissent des traces ; tokens,
+    coûts et latences restent visibles.
+    """
+    if isinstance(data, str):
+        return MASKED_TEXT
+    if isinstance(data, dict):
+        return {key: mask_text_content(data=value) for key, value in data.items()}
+    if isinstance(data, list):
+        return [mask_text_content(data=item) for item in data]
+    return data
+
+
+def _trace_content_enabled() -> bool:
+    """LANGFUSE_TRACE_CONTENT=false : ne tracer que les mesures, pas le texte."""
+    return os.getenv("LANGFUSE_TRACE_CONTENT", "true").lower() != "false"
+
+
 # Sans clés, le client Langfuse ne fait rien : l'API fonctionne sans traçage.
-langfuse = Langfuse(tracing_enabled=_tracing_configured())
+langfuse = Langfuse(
+    tracing_enabled=_tracing_configured(),
+    mask=None if _trace_content_enabled() else mask_text_content,
+)
 
 
-def get_embeddings(settings: Settings) -> MistralAIEmbeddings:
-    """Initialise le modèle d'embeddings Mistral."""
+# Périmètre des jetons Entra ID acceptés par Azure OpenAI.
+AZURE_COGNITIVE_SERVICES_SCOPE = "https://cognitiveservices.azure.com/.default"
+
+
+def get_azure_token_provider(azure: AzureOpenAISettings) -> Callable[[], str] | None:
+    """Fournisseur de jetons Entra ID quand Azure OpenAI est appelé sans clé.
+
+    DefaultAzureCredential essaie plusieurs sources : l'identité managée
+    sur Azure, le compte ``az login`` sur le poste. Le jeton est renouvelé
+    automatiquement avant expiration. Avec une clé, renvoie None : le client
+    OpenAI n'utilise alors que la clé.
+    """
+    if azure.api_key:
+        return None
+    return get_bearer_token_provider(
+        DefaultAzureCredential(), AZURE_COGNITIVE_SERVICES_SCOPE
+    )
+
+
+def get_embeddings(settings: Settings) -> Embeddings:
+    """Initialise le modèle d'embeddings du fournisseur configuré."""
+    if settings.llm_provider == "azure_openai":
+        azure = get_azure_openai_settings()
+        return AzureOpenAIEmbeddings(
+            azure_deployment=settings.embedding_model,
+            azure_endpoint=azure.endpoint,
+            api_key=azure.api_key,
+            azure_ad_token_provider=get_azure_token_provider(azure),
+            api_version=azure.api_version,
+            timeout=settings.llm_timeout_seconds,
+        )
+    return get_mistral_embeddings(
+        settings.embedding_model, settings.llm_timeout_seconds
+    )
+
+
+def get_mistral_embeddings(model: str, timeout_seconds: float) -> MistralAIEmbeddings:
+    """Initialise un modèle d'embeddings Mistral."""
     return MistralAIEmbeddings(
-        model=settings.embedding_model,
+        model=model,
         api_key=get_mistral_api_key(),
+        timeout=int(timeout_seconds),
+    )
+
+
+def get_llm(settings: Settings) -> BaseChatModel:
+    """Initialise le LLM de génération du fournisseur configuré."""
+    if settings.llm_provider == "azure_openai":
+        azure = get_azure_openai_settings()
+        return AzureChatOpenAI(
+            azure_deployment=settings.llm_model,
+            azure_endpoint=azure.endpoint,
+            api_key=azure.api_key,
+            azure_ad_token_provider=get_azure_token_provider(azure),
+            api_version=azure.api_version,
+            temperature=settings.llm_temperature,
+            max_tokens=settings.llm_max_tokens,
+            timeout=settings.llm_timeout_seconds,
+        )
+    return ChatMistralAI(
+        model=settings.llm_model,
+        api_key=get_mistral_api_key(),
+        temperature=settings.llm_temperature,
+        max_tokens=settings.llm_max_tokens,
+        timeout=int(settings.llm_timeout_seconds),
     )
 
 
@@ -125,13 +227,12 @@ def build_components(vectorstore: VectorStore | None = None) -> RagComponents:
     embeddings = get_embeddings(settings)
     if vectorstore is None:
         vectorstore = open_store(settings, embeddings)
-    llm = ChatMistralAI(
-        model=settings.llm_model,
-        api_key=get_mistral_api_key(),
-        temperature=settings.llm_temperature,
-    )
+    llm = get_llm(settings)
     logger.info(
-        "Chaîne RAG prête (modèle: %s, top_k: %d)", settings.llm_model, settings.top_k
+        "Chaîne RAG prête (fournisseur: %s, modèle: %s, top_k: %d)",
+        settings.llm_provider,
+        settings.llm_model,
+        settings.top_k,
     )
     return RagComponents(settings, embeddings, vectorstore, llm)
 
@@ -224,7 +325,7 @@ def answer_question(
             context=_format_docs(documents), question=question
         )
         with langfuse.start_as_current_observation(
-            name="mistral-chat",
+            name="llm-chat",
             as_type="generation",
             model=settings.llm_model,
             model_parameters={"temperature": settings.llm_temperature},
@@ -267,7 +368,8 @@ def ask(question: str) -> dict:
         - "answer": la réponse générée par le LLM
         - "sources": les chunks utilisés comme contexte
     """
-    logger.info("Question reçue : '%s'", question)
+    # La question peut contenir des données personnelles : pas en INFO
+    logger.debug("Question reçue : '%s'", question)
     result = answer_question(question)
 
     sources = [

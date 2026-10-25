@@ -4,15 +4,18 @@ version = "1.1.0"
 description = "Chatbot RAG d'événements culturels en Île-de-France"
 requires-python = ">=3.12"
 dependencies = [
+    "azure-identity>=1.26.0",
     "fastapi>=0.162.0",
     "langchain>=0.3",
     "langchain-mistralai>=1.1.6",
+    "langchain-openai>=1.0",
     "langchain-postgres>=0.0.19",
     "langfuse>=5.0.4",
     "pandas>=3.1.0",
     "psycopg[binary]>=3.3.6",
     "python-dotenv>=1.2.4",
     "requests>=2.34.2",
+    "slowapi>=0.1.9",
     "uvicorn>=0.54.0",
 ]
 

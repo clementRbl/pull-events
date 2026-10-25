@@ -1,0 +1,7 @@
+# Cluster kind local : Secret créé à la main, ingress HTTP sur localhost.
+secrets:
+  source: existing
+ingress:
+  host: pull-events.localtest.me
+  tls:
+    enabled: false

@@ -2,12 +2,30 @@
 
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 
-from api.main import app
+from api.main import app, limiter, rebuild_lock
 from scripts.vector_db import VectorStoreUnavailableError
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def open_api(monkeypatch):
+    """Par défaut, API ouverte comme en local, même si .env définit API_KEY.
+
+    Les compteurs de limite de débit repartent de zéro à chaque test.
+    """
+    monkeypatch.delenv("API_KEY", raising=False)
+    monkeypatch.delenv("ENABLE_REBUILD", raising=False)
+    limiter.reset()
+
+
+@pytest.fixture
+def rebuild_enabled(monkeypatch):
+    """Autorise /rebuild, désactivé par défaut."""
+    monkeypatch.setenv("ENABLE_REBUILD", "true")
 
 
 # === Tests /health ===
@@ -122,11 +140,116 @@ def test_ask_missing_api_key(mock_ask):
     assert "Erreur de configuration" in response.json()["detail"]
 
 
+@patch("api.main.ask")
+def test_ask_errors_do_not_leak_details(mock_ask):
+    """Le message d'erreur interne reste dans les logs, pas dans la réponse."""
+    mock_ask.side_effect = ValueError("postgresql://admin:secret@host/db")
+
+    response = client.post("/ask", json={"question": "Test ?"})
+
+    assert "secret" not in response.text
+
+
+@patch("api.main.ask")
+def test_ask_rate_limited_per_ip(mock_ask):
+    """Au-delà de 10 questions par minute depuis une IP : 429."""
+    mock_ask.return_value = {"answer": "Réponse", "sources": []}
+
+    statuses = [
+        client.post("/ask", json={"question": "Test ?"}).status_code for _ in range(11)
+    ]
+
+    assert statuses[:10] == [200] * 10
+    assert statuses[10] == 429
+
+
+@patch("api.main.ask")
+def test_ask_rate_limit_keys_on_last_forwarded_address(mock_ask):
+    """Seule la dernière adresse de X-Forwarded-For (ajoutée par l'ingress) compte.
+
+    Changer le début de l'en-tête ne contourne pas la limite ; un autre
+    client réel (dernière adresse différente) a son propre compteur.
+    """
+    mock_ask.return_value = {"answer": "Réponse", "sources": []}
+
+    def post(forwarded_for: str) -> int:
+        response = client.post(
+            "/ask",
+            json={"question": "Test ?"},
+            headers={"X-Forwarded-For": forwarded_for},
+        )
+        return response.status_code
+
+    first_ten = [post(f"10.0.0.{i}, 203.0.113.9") for i in range(10)]
+
+    assert first_ten == [200] * 10
+    assert post("10.0.0.99, 203.0.113.9") == 429
+    assert post("203.0.113.9, 198.51.100.1") == 200
+
+
+# === Protection par clé d'API (déploiement public) ===
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [{}, {"X-API-Key": "mauvaise-cle"}],
+    ids=["sans-cle", "mauvaise-cle"],
+)
+@patch("api.main.ask")
+def test_ask_rejects_missing_or_wrong_api_key(mock_ask, monkeypatch, headers):
+    """Avec API_KEY, /ask refuse sans la bonne clé et n'appelle pas le LLM."""
+    monkeypatch.setenv("API_KEY", "cle-secrete")
+
+    response = client.post("/ask", json={"question": "Test ?"}, headers=headers)
+
+    assert response.status_code == 401
+    mock_ask.assert_not_called()
+
+
+@patch("api.main.ask")
+def test_ask_accepts_right_api_key(mock_ask, monkeypatch):
+    """Avec la bonne clé dans X-API-Key, /ask répond normalement."""
+    monkeypatch.setenv("API_KEY", "cle-secrete")
+    mock_ask.return_value = {"answer": "Réponse", "sources": []}
+
+    response = client.post(
+        "/ask", json={"question": "Test ?"}, headers={"X-API-Key": "cle-secrete"}
+    )
+
+    assert response.status_code == 200
+
+
+def test_health_stays_open_with_api_key(monkeypatch):
+    """/health reste accessible sans clé : la sonde d'Azure doit pouvoir l'appeler."""
+    monkeypatch.setenv("API_KEY", "cle-secrete")
+
+    assert client.get("/health").status_code == 200
+
+
 # === Tests /rebuild ===
 
 
 @patch("subprocess.run")
-def test_rebuild_success(mock_run):
+def test_rebuild_disabled_by_default(mock_run):
+    """Sans ENABLE_REBUILD=true, /rebuild est refusé sans lancer aucun script."""
+    response = client.post("/rebuild")
+
+    assert response.status_code == 403
+    mock_run.assert_not_called()
+
+
+@patch("subprocess.run")
+def test_rebuild_refused_while_running(mock_run, rebuild_enabled):
+    """Une seule reconstruction à la fois : la seconde reçoit 409."""
+    with rebuild_lock:
+        response = client.post("/rebuild")
+
+    assert response.status_code == 409
+    mock_run.assert_not_called()
+
+
+@patch("subprocess.run")
+def test_rebuild_success(mock_run, rebuild_enabled):
     """POST /rebuild retourne un succès quand les scripts s'exécutent."""
     mock_run.return_value = type("Result", (), {"returncode": 0, "stderr": ""})()
 
@@ -140,7 +263,7 @@ def test_rebuild_success(mock_run):
 
 
 @patch("subprocess.run")
-def test_rebuild_script_failure(mock_run):
+def test_rebuild_script_failure(mock_run, rebuild_enabled):
     """POST /rebuild retourne 500 si un script échoue."""
     mock_run.return_value = type(
         "Result", (), {"returncode": 1, "stderr": "Erreur réseau"}
@@ -150,6 +273,7 @@ def test_rebuild_script_failure(mock_run):
 
     assert response.status_code == 500
     assert "Échec" in response.json()["detail"]
+    assert "Erreur réseau" not in response.json()["detail"]
 
 
 # === Test documentation Swagger ===
