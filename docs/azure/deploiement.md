@@ -30,7 +30,7 @@ URL de l'API : https://ca-pull-events-api.graybeach-3085945a.francecentral.azure
 
 ## Inventaire des ressources
 
-Toutes dans l'abonnement « Azure subscription 1 » (essai gratuit), groupe de ressources **`rg-pull-events`**, région **`francecentral`**, étiquette `project=pull-events`. Le suffixe `cr24` rend uniques les noms qui doivent l'être dans tout Azure.
+Toutes dans l'abonnement « Azure subscription 1 » (« Plan Azure », paiement à l'utilisation, sans crédit ; 12 mois de services gratuits jusqu'au 24/10/2027), groupe de ressources **`rg-pull-events`**, région **`francecentral`**, étiquette `project=pull-events`. Le suffixe `cr24` rend uniques les noms qui doivent l'être dans tout Azure.
 
 | Ressource | Nom | Réglages |
 |---|---|---|
@@ -47,7 +47,7 @@ Toutes dans l'abonnement « Azure subscription 1 » (essai gratuit), groupe de r
 | Rôle PostgreSQL | `pullevents_app` | Utilisé par l'API : `CONNECT` sur `pullevents`, `USAGE` sur `public`, **`SELECT` seulement** sur les tables, y compris celles recréées plus tard par `pgadmin` (`ALTER DEFAULT PRIVILEGES`) |
 | Log Analytics | `log-pull-events` | Rétention 30 jours ; reçoit les journaux des conteneurs ; plafond d'ingestion 0,5 Go/jour depuis l'audit du 25/10 |
 | Environnement Container Apps | `cae-pull-events` | Plan Consommation, journaux vers `log-pull-events` |
-| Container App | `ca-pull-events-api` | Image `ghcr.io/clementrbl/pull-events:0.2.1-azure`, 0,5 vCPU, 1 Go, **0 à 1 réplica** (mise à zéro sans trafic), ingress externe HTTPS vers le port 8000, mode de révision unique, identité managée système |
+| Container App | `ca-pull-events-api` | Image `ghcr.io/clementrbl/pull-events:0.2.1-azure` à la création, `1.3.0` depuis le 25/10/2026 (géré par Terraform), 0,5 vCPU, 1 Go, **0 à 1 réplica** (mise à zéro sans trafic), ingress externe HTTPS vers le port 8000, mode de révision unique, identité managée système |
 | Attribution de rôle | `Key Vault Secrets User` | Identité de `ca-pull-events-api`, sur chacun des cinq secrets qu'elle lit (sur tout le coffre à la création, restreint par l'audit du 25/10) |
 | Attribution de rôle | `Key Vault Secrets Officer` | Ton compte sur `kv-pull-events-cr24` (pour écrire les secrets) |
 
@@ -143,11 +143,11 @@ Prix de détail relevés le 24/10/2026 sur l'[API publique des prix Azure](https
 | Ressource | Prix | Par mois (usage démo) | Avec les offres gratuites |
 |---|---|---|---|
 | Container Apps | au-delà de 180 000 vCPU-s, 360 000 Gio-s et 2 M requêtes gratuits par mois | ≈ 0 € (mise à zéro sans trafic) | 0 € |
-| PostgreSQL B1ms | 0,0167 €/h + stockage | ≈ 12 € + ≈ 4 € | 0 € pendant 12 mois (750 h et 32 Go inclus, à confirmer dans *Cost Management*) |
+| PostgreSQL B1ms | 0,0167 €/h + stockage | ≈ 12 € + ≈ 4 € | 0 € jusqu'au 24/10/2027 (750 h et 32 Go inclus, vérifié sur le portail le 25/10/2026) |
 | Key Vault | 0,026 € / 10 000 opérations | < 0,01 € | |
 | Log Analytics | facturé à l'ingestion au-delà de 5 Go/mois | ≈ 0 € | |
-| `gpt-4.1-mini` Standard | 0,484 $ / 1,936 $ par million de tokens (entrée / sortie) | ≈ 1,3 $ pour 1 000 questions | sur le crédit |
-| `text-embedding-3-small` Data Zone | ≈ 0,022 $ par million de tokens (l'API des prix n'a pas de ligne Data Zone : 0,020 $ en Global, 0,022 à 0,027 $ en régional) | indexation complète ≈ 0,3 $, une fois | sur le crédit |
+| `gpt-4.1-mini` Standard | 0,484 $ / 1,936 $ par million de tokens (entrée / sortie) | ≈ 1,3 $ pour 1 000 questions | en argent réel |
+| `text-embedding-3-small` Data Zone | ≈ 0,022 $ par million de tokens (l'API des prix n'a pas de ligne Data Zone : 0,020 $ en Global, 0,022 à 0,027 $ en régional) | indexation complète ≈ 0,3 $, une fois | en argent réel |
 | **Total** | | **≈ 16 €/mois** | **≈ 0 à 2 €/mois** |
 
 D'après l'API Azure (audit du 25/10/2026), l'abonnement est au **paiement à l'utilisation** (`PayAsYouGo`, limite de dépense désactivée, carte active) et aucun crédit n'est visible ; les 12 mois de services gratuits ne sont pas vérifiables par l'API. Confirmé sur le portail le 25/10/2026 : aucun crédit, mais les **12 mois de services gratuits** (jusqu'au 24/10/2027) couvrent PostgreSQL Burstable 750 h/mois, 32 Go de stockage et 32 Go de sauvegarde : la base ne coûte rien pendant un an.

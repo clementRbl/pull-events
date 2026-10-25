@@ -144,7 +144,7 @@ Vérifié sur le portail le 25/10/2026 : abonnement **« Plan Azure »** (paieme
 Plan: 23 to add, 0 to change, 8 to destroy.
 ```
 
-À créer : VNet et trois sous-réseaux, zone DNS privée et son lien, Private Endpoint PostgreSQL, identité du cluster et son rôle *Network Contributor*, IP publique avec étiquette DNS, cluster AKS, cinq rôles Key Vault pour l'add-on CSI. À remplacer : l'environnement Container Apps et l'application (le VNet ne s'ajoute pas après coup), et les cinq rôles de l'application (leur identité change avec elle). À détruire : la règle `0.0.0.0`. Rien d'inattendu : le code est valide, l'application reviendrait à activer deux variables.
+À créer : VNet et trois sous-réseaux, zone DNS privée et son lien, Private Endpoint PostgreSQL, identité du cluster et son rôle *Network Contributor*, IP publique avec étiquette DNS, cluster AKS, cinq rôles Key Vault pour l'add-on CSI. À remplacer : l'environnement Container Apps et l'application (le VNet ne s'ajoute pas après coup), et les cinq rôles de l'application (leur identité change avec elle). À détruire : la règle `0.0.0.0`. Terraform compte un remplacement à la fois dans « add » et dans « destroy » : `8 to destroy` = 7 remplacements + 1 suppression, et les 23 ajouts comprennent les 7 recréations. Rien d'inattendu : le code est valide, l'application reviendrait à activer deux variables.
 
 ## Détruire
 

@@ -6,7 +6,7 @@ La version 1.1 remplace l'index Faiss par **PostgreSQL + pgvector** et ajoute **
 
 La version 1.2 tourne aussi sur **Azure** : Container Apps, Azure OpenAI (Foundry), PostgreSQL Flexible Server + pgvector, Key Vault. Voir [docs/azure/deploiement.md](docs/azure/deploiement.md).
 
-La version 1.3 décrit toute cette infrastructure en **Terraform** (ressources importées, `terraform plan` vide, durcissement après audit) et déploie la même API sur **Kubernetes** avec un chart Helm, sur kind en local puis sur AKS. Voir [docs/azure/terraform.md](docs/azure/terraform.md) et [docs/azure/kubernetes.md](docs/azure/kubernetes.md).
+La version 1.3 décrit toute cette infrastructure en **Terraform** (ressources importées, `terraform plan` vide, durcissement après audit) et déploie la même API sur **Kubernetes** avec un chart Helm, prouvé sur kind en local. AKS est écrit en Terraform et validé par un plan à blanc, sans avoir été créé (zéro dépense). Voir [docs/azure/terraform.md](docs/azure/terraform.md) et [docs/azure/kubernetes.md](docs/azure/kubernetes.md).
 
 ## Stack technique
 
@@ -23,7 +23,7 @@ La version 1.3 décrit toute cette infrastructure en **Terraform** (ressources i
 | Conteneurisation | Docker Compose ; image publiée sur GHCR |
 | Cloud | Azure Container Apps, Azure OpenAI (Foundry), PostgreSQL Flexible Server, Key Vault |
 | Infrastructure as code | Terraform 1.17, provider azurerm 5 (`infra/terraform/`) |
-| Kubernetes | Chart Helm (`k8s/pull-events/`), kind en local, AKS sur Azure |
+| Kubernetes | Chart Helm (`k8s/pull-events/`), kind en local ; AKS planifié en Terraform, non créé |
 
 ## Architecture du système
 

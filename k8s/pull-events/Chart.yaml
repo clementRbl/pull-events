@@ -3,4 +3,4 @@ name: pull-events
 description: API RAG Puls-Events (FastAPI) sur Kubernetes
 type: application
 version: 0.1.0
-appVersion: "1.2.0"
+appVersion: "1.3.0"
