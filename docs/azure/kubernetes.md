@@ -23,7 +23,7 @@ Prérequis : Docker, `kind` 0.33, `kubectl` 1.35, `helm` 3.20 (binaires dans `~/
 
 ```bash
 export DOCKER_CONTEXT=default
-kind create cluster --config k8s/kind/cluster.yaml          # ports 80/443 du poste → ingress
+kind create cluster --config k8s/kind/cluster.yaml          # ports 80/443 du poste, sur 127.0.0.1 seulement → ingress
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/kind/deploy.yaml
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 kubectl patch -n kube-system deployment metrics-server --type=json \
