@@ -127,7 +127,7 @@ Tout ce qui change d'un environnement à l'autre passe par des variables d'envir
 |----------|--------|------|
 | `LLM_PROVIDER` | `mistral` | Fournisseur du LLM et des embeddings : `mistral` ou `azure_openai` |
 | `MISTRAL_API_KEY` | — | Clé API Mistral (obligatoire avec `mistral`) |
-| `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_API_VERSION` | — / — / `2024-10-21` | Accès Azure OpenAI. `LLM_MODEL` et `EMBEDDING_MODEL` désignent alors les noms des déploiements |
+| `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_API_VERSION` | — / — / `2024-10-21` | Accès Azure OpenAI. `LLM_MODEL` et `EMBEDDING_MODEL` désignent alors les noms des déploiements. Sans `AZURE_OPENAI_API_KEY`, authentification par identité Entra ID (`DefaultAzureCredential` : identité managée sur Azure, `az login` sur le poste ; rôle `Cognitive Services OpenAI User` requis) |
 | `DATABASE_URL` | `postgresql+psycopg://pullevents:pullevents@localhost:5432/pullevents` | Base pgvector |
 | `VECTOR_TABLE` | `event_chunks` | Table des chunks |
 | `LLM_MODEL` / `EMBEDDING_MODEL` / `EMBEDDING_SIZE` | `ministral-8b-latest` / `mistral-embed` / `1024` | Modèles (changer d'embeddings impose de réindexer) |
@@ -204,7 +204,7 @@ curl -X POST http://localhost:8000/ask \
 
 Codes d'erreur : `401` clé d'API absente ou fausse (si `API_KEY` est définie), `403` reconstruction désactivée, `409` reconstruction déjà en cours, `422` question invalide, `429` limite de débit dépassée, `503` base vectorielle indisponible, `500` configuration manquante. Les messages d'erreur restent génériques : le détail est dans les journaux du serveur.
 
-Limites de débit (`slowapi`, en mémoire) : 10 questions par minute et par IP, 30 par minute et par clé d'API, une reconstruction par jour. En local, l'API n'écoute que sur `127.0.0.1` (`launch.sh` et Docker Compose).
+Limites de débit (`slowapi`, en mémoire) : 10 questions par minute et par IP, 30 par minute et par clé d'API, une reconstruction par jour. L'IP retenue est la dernière adresse de `X-Forwarded-For`, celle qu'ajoute l'ingress Azure : un en-tête forgé par le client ne change pas son compteur. En local, l'API n'écoute que sur `127.0.0.1` (`launch.sh` et Docker Compose).
 
 Sur Azure, ajouter l'en-tête `X-API-Key` (la clé est dans le Key Vault, voir [docs/azure/deploiement.md](docs/azure/deploiement.md#appeler-lapi)).
 
@@ -214,9 +214,9 @@ Sur Azure, ajouter l'en-tête `X-API-Key` (la clé est dans le Key Vault, voir [
 uv run pytest -v
 ```
 
-- `tests/test_api.py` : endpoints, erreurs génériques, Swagger, clé d'API, limite de débit, `/rebuild` désactivé par défaut et verrouillé
+- `tests/test_api.py` : endpoints, erreurs génériques, Swagger, clé d'API, limite de débit (non contournable par `X-Forwarded-For`), `/rebuild` désactivé par défaut et verrouillé
 - `tests/test_scripts.py` : nettoyage, chunking, ingestion
-- `tests/test_rag.py` : configuration par variables d'environnement, choix du fournisseur (Mistral ou Azure OpenAI), calcul du coût, chaîne RAG instrumentée (LLM simulé), échange de tables pgvector sur une vraie base (ignoré si `docker compose up -d db` n'est pas lancé)
+- `tests/test_rag.py` : configuration par variables d'environnement, choix du fournisseur (Mistral, Azure OpenAI par clé ou par identité managée), calcul du coût, chaîne RAG instrumentée (LLM simulé), échange de tables pgvector sur une vraie base (ignoré si `docker compose up -d db` n'est pas lancé)
 
 ## Évaluation : qualité et coûts
 
@@ -316,7 +316,7 @@ pull-events/
 │   ├── article-blog.md        # Brouillon d'article
 │   └── architecture.mmd
 ├── docker-compose.yml         # pgvector, API, Langfuse
-├── Dockerfile                 # Image API (uv)
+├── Dockerfile                 # Image API (uv, utilisateur non root)
 ├── launch.sh
 ├── pyproject.toml / uv.lock
 └── .env.example

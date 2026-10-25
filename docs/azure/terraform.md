@@ -115,7 +115,7 @@ Trois options ont été chiffrées :
 | Remplacer `0.0.0.0` par les adresses sortantes de l'environnement Container Apps | 0 € | Le plan a révélé **181 adresses**, le pool partagé de Container Apps en France Central : on passerait de « tout Azure » à « tout client Container Apps de la région », pour 181 règles qui peuvent changer sans prévenir. Gain trop faible pour le prix en lisibilité |
 | Garder la règle, documenter le risque | 0 € | **Retenu.** Remparts : TLS imposé, mot de passe aléatoire de 35 caractères, rôle `pullevents_app` en lecture seule pour l'API, quotas TPM réduits |
 
-Restent à faire côté code : appel d'Azure OpenAI par identité managée (`disable_local_auth`), dernière adresse de `X-Forwarded-For` pour la limite de débit, utilisateur non root dans l'image (fait sur Kubernetes par `runAsNonRoot`).
+Côté code, les trois corrections sont faites (dernière adresse de `X-Forwarded-For`, utilisateur non root dans l'image, Azure OpenAI par identité managée quand `AZURE_OPENAI_API_KEY` est absente) mais pas encore publiées : nouvelle image à pousser sur GHCR et à référencer dans `api_image`, puis rôle `Cognitive Services OpenAI User` et `local_auth_enabled = false` (proposition en commentaire dans `ai.tf`, marche à suivre dans [deploiement.md](deploiement.md#azure-openai-sans-clé--identité-managée-à-activer)).
 
 ## Coût
 

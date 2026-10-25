@@ -163,6 +163,30 @@ def test_ask_rate_limited_per_ip(mock_ask):
     assert statuses[10] == 429
 
 
+@patch("api.main.ask")
+def test_ask_rate_limit_keys_on_last_forwarded_address(mock_ask):
+    """Seule la dernière adresse de X-Forwarded-For (ajoutée par l'ingress) compte.
+
+    Changer le début de l'en-tête ne contourne pas la limite ; un autre
+    client réel (dernière adresse différente) a son propre compteur.
+    """
+    mock_ask.return_value = {"answer": "Réponse", "sources": []}
+
+    def post(forwarded_for: str) -> int:
+        response = client.post(
+            "/ask",
+            json={"question": "Test ?"},
+            headers={"X-Forwarded-For": forwarded_for},
+        )
+        return response.status_code
+
+    first_ten = [post(f"10.0.0.{i}, 203.0.113.9") for i in range(10)]
+
+    assert first_ten == [200] * 10
+    assert post("10.0.0.99, 203.0.113.9") == 429
+    assert post("203.0.113.9, 198.51.100.1") == 200
+
+
 # === Protection par clé d'API (déploiement public) ===
 
 

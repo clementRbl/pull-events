@@ -87,7 +87,10 @@ Mesures appliquées après l'audit du 25/10/2026 :
 
 | Risque | Mesure |
 |---|---|
-| URL publique : consommation de tokens par n'importe qui | Clé d'API (`X-API-Key`) + limites de débit : 10 questions/min par IP (IP réelle lue dans `X-Forwarded-For`, uvicorn `--proxy-headers`), 30/min par clé. Vérifié sur Azure : la 11ᵉ question de la minute reçoit 429 |
+| URL publique : consommation de tokens par n'importe qui | Clé d'API (`X-API-Key`) + limites de débit : 10 questions/min par IP, 30/min par clé. Vérifié sur Azure : la 11ᵉ question de la minute reçoit 429 |
+| Limite par IP contournable en forgeant `X-Forwarded-For` (audit 3.4) | L'API lit la **dernière** adresse de `X-Forwarded-For`, celle qu'ajoute l'ingress Envoy ; `--forwarded-allow-ips "*"` retiré du `Dockerfile`. Test `tests/test_api.py`. **Dans le code, pas encore dans l'image publiée** |
+| Conteneur exécuté en root (audit 3.3) | Utilisateur `app` (uid 1000, le même que `runAsUser` du chart Helm) dans le `Dockerfile`. **Idem : image à republier** |
+| Azure OpenAI appelé par clé (audit 4.1) | Code prêt pour l'identité managée (`DefaultAzureCredential`, sans `AZURE_OPENAI_API_KEY`). **Rôle et désactivation des clés à faire côté Azure**, voir [ci-dessous](#azure-openai-sans-clé--identité-managée-à-activer) |
 | Réindexation déclenchée à distance | `/rebuild` désactivé par défaut, une exécution à la fois, une par jour |
 | Réponse qui s'emballe ou bloque | `max_tokens=1024`, délai de 60 s sur le LLM et les embeddings |
 | Fuite d'informations dans les erreurs | Messages génériques ; détail (dont `stderr`) dans les journaux Log Analytics |
@@ -96,7 +99,33 @@ Mesures appliquées après l'audit du 25/10/2026 :
 | Clés partagées entre environnements | Clé Mistral retirée du coffre ; projet Langfuse Cloud réservé à Azure (le local retrouve son Langfuse auto-hébergé) |
 | Clé d'API vue en clair pendant les tests | Clé renouvelée |
 
-**Risque résiduel accepté : la règle `allow-azure-services`.** Elle autorise le port 5432 depuis toute adresse Azure, y compris d'autres clients. Restent exigés : TLS, un mot de passe aléatoire de 35 caractères et, pour l'API, un rôle en lecture seule. En plan Consommation sans réseau virtuel, les adresses sortantes de Container Apps ne sont pas garanties stables (une liste d'adresses partagées, qui peut changer), donc impossible de les mettre seules en liste blanche de façon fiable. La vraie correction est un réseau virtuel (environnement Container Apps intégré au VNet, PostgreSQL joint par un point de terminaison privé) : écrite en Terraform (`network.tf`, bascule `private_network`), coût ≈ 7 €/mois, **non activée** le 25/10/2026 (aucun crédit Azure, règle zéro dépense ; détail et options chiffrées dans [terraform.md](terraform.md)). Pas fait non plus : restriction d'IP sur l'ingress (la démo doit rester joignable), accès sans clé à Azure OpenAI par identité managée (voir la fiche AI-103).
+**Risque résiduel accepté : la règle `allow-azure-services`.** Elle autorise le port 5432 depuis toute adresse Azure, y compris d'autres clients. Restent exigés : TLS, un mot de passe aléatoire de 35 caractères et, pour l'API, un rôle en lecture seule. En plan Consommation sans réseau virtuel, les adresses sortantes de Container Apps ne sont pas garanties stables (une liste d'adresses partagées, qui peut changer), donc impossible de les mettre seules en liste blanche de façon fiable. La vraie correction est un réseau virtuel (environnement Container Apps intégré au VNet, PostgreSQL joint par un point de terminaison privé) : écrite en Terraform (`network.tf`, bascule `private_network`), coût ≈ 7 €/mois, **non activée** le 25/10/2026 (aucun crédit Azure, règle zéro dépense ; détail et options chiffrées dans [terraform.md](terraform.md)). Pas fait non plus : restriction d'IP sur l'ingress (la démo doit rester joignable).
+
+### Azure OpenAI sans clé : identité managée, à activer
+
+Le code (`scripts/rag_chain.py`, `scripts/config.py`) n'exige plus `AZURE_OPENAI_API_KEY`. Sans elle, il obtient un jeton Entra ID avec `DefaultAzureCredential` (bibliothèque `azure-identity`) : l'identité managée de la Container App sur Azure, le compte `az login` sur le poste. Le jeton est renouvelé automatiquement ; le périmètre demandé est `https://cognitiveservices.azure.com/.default`. Avantage : plus aucun secret qui, s'il fuit, permette de consommer des tokens hors de l'API. Aucun coût : une attribution de rôle est gratuite.
+
+Rien de ceci n'a été appliqué le 25/10/2026. Ordre à suivre, chaque étape vérifiable avant la suivante :
+
+1. **Publier l'image** qui contient `azure-identity`, l'utilisateur non root et la nouvelle clé de limite de débit (par exemple `ghcr.io/clementrbl/pull-events:0.2.2-azure`), puis la référencer dans `infra/terraform/variables.tf` (variable `api_image`) et appliquer.
+2. **Donner le rôle** `Cognitive Services OpenAI User` à l'identité managée de la Container App, sur le compte Foundry (le rôle autorise les appels d'inférence, pas la gestion du compte ni la lecture des clés) :
+
+   ```bash
+   az role assignment create \
+     --assignee-object-id $(az containerapp show -g rg-pull-events -n ca-pull-events-api --query identity.principalId -o tsv) \
+     --assignee-principal-type ServicePrincipal --role "Cognitive Services OpenAI User" \
+     --scope $(az cognitiveservices account show -g rg-pull-events -n ais-pull-events-cr24 --query id -o tsv)
+   ```
+
+   Équivalent Terraform, prêt en commentaire dans `infra/terraform/ai.tf` (ressource `azurerm_role_assignment.openai_user_api`). La propagation d'un rôle prend quelques minutes.
+3. **Retirer la variable** `AZURE_OPENAI_API_KEY` de la Container App : supprimer son bloc `env` dans `container_apps.tf` et `azure-openai-api-key` de `local.app_secret_names` dans `main.tf` (ou, à la main, `az containerapp update -g rg-pull-events -n ca-pull-events-api --remove-env-vars AZURE_OPENAI_API_KEY`). Vérifier qu'une question sur `/ask` répond 200 et que les journaux ne montrent pas de 401 venant d'Azure OpenAI.
+4. **Couper les clés du compte** (`disable_local_auth`) : dans `ai.tf`, `local_auth_enabled = false` sur `azurerm_cognitive_account.ai`, ou `az resource update --ids <id du compte> --set properties.disableLocalAuth=true`. Dès lors, `key1`/`key2` ne servent plus à rien, même si elles fuient. Supprimer ensuite le secret `azure-openai-api-key` du Key Vault et l'attribution de rôle qui le lisait.
+
+À savoir :
+
+- Depuis le poste (indexation, évaluation), même chose : sans `AZURE_OPENAI_API_KEY`, `az login` suffit, à condition que ton compte ait aussi le rôle `Cognitive Services OpenAI User` sur le compte Foundry.
+- Sur Kubernetes (`k8s/pull-events`), l'identité managée du pod demande *Workload Identity* (fédération entre un ServiceAccount et une identité Azure), que le chart ne configure pas : y garder la clé tant que l'étape 4 n'est pas faite, ou ajouter cette fédération d'abord.
+- `AZURE_OPENAI_API_KEY` vide compte comme absente : pas besoin de la retirer de `docker-compose.yml`.
 
 Renouveler la clé d'API :
 

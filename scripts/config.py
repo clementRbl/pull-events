@@ -111,15 +111,19 @@ def get_mistral_api_key() -> str:
 
 @dataclass(frozen=True)
 class AzureOpenAISettings:
-    """Accès à Azure OpenAI : un point de terminaison et une clé.
+    """Accès à Azure OpenAI : un point de terminaison et, au choix, une clé.
 
     Sur Azure, on n'appelle pas un modèle par son nom mais un *déploiement*
     (une instance du modèle créée dans la ressource, avec son propre quota).
     LLM_MODEL et EMBEDDING_MODEL contiennent alors les noms des déploiements.
+
+    Sans clé (``api_key`` à None), l'application s'authentifie par son
+    identité Entra ID : identité managée de la Container App sur Azure,
+    compte ``az login`` sur le poste.
     """
 
     endpoint: str
-    api_key: str
+    api_key: str | None
     api_version: str
 
 
@@ -127,19 +131,16 @@ def get_azure_openai_settings() -> AzureOpenAISettings:
     """Lit la configuration Azure OpenAI depuis l'environnement.
 
     Raises:
-        ValueError: Si le point de terminaison ou la clé ne sont pas définis.
+        ValueError: Si le point de terminaison n'est pas défini.
     """
     endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-    api_key = os.getenv("AZURE_OPENAI_API_KEY")
-    if not endpoint or not api_key:
-        msg = (
-            "AZURE_OPENAI_ENDPOINT et AZURE_OPENAI_API_KEY doivent être définies "
-            "quand LLM_PROVIDER=azure_openai"
-        )
+    if not endpoint:
+        msg = "AZURE_OPENAI_ENDPOINT doit être définie quand LLM_PROVIDER=azure_openai"
         raise ValueError(msg)
     return AzureOpenAISettings(
         endpoint=endpoint,
-        api_key=api_key,
+        # Une clé vide compte comme absente : identité managée.
+        api_key=os.getenv("AZURE_OPENAI_API_KEY") or None,
         api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21"),
     )
 

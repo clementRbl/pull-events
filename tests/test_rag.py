@@ -57,7 +57,7 @@ def test_settings_reject_unknown_llm_provider():
             get_settings()
 
 
-def test_azure_provider_requires_endpoint_and_key(monkeypatch):
+def test_azure_provider_requires_endpoint(monkeypatch):
     """Azure OpenAI sans point de terminaison : erreur claire, pas d'appel réseau."""
     monkeypatch.setenv("LLM_PROVIDER", "azure_openai")
     monkeypatch.delenv("AZURE_OPENAI_ENDPOINT", raising=False)
@@ -65,6 +65,41 @@ def test_azure_provider_requires_endpoint_and_key(monkeypatch):
 
     with pytest.raises(ValueError, match="AZURE_OPENAI_ENDPOINT"):
         get_llm(get_settings())
+
+
+@patch("scripts.rag_chain.get_bearer_token_provider")
+@patch("scripts.rag_chain.DefaultAzureCredential")
+def test_azure_provider_without_key_uses_managed_identity(
+    mock_credential, mock_token_provider, monkeypatch
+):
+    """Sans AZURE_OPENAI_API_KEY, le LLM s'authentifie par jeton Entra ID."""
+    monkeypatch.setenv("LLM_PROVIDER", "azure_openai")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://exemple.openai.azure.com/")
+    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
+    fake_provider = MagicMock(name="token_provider")
+    mock_token_provider.return_value = fake_provider
+
+    llm = get_llm(get_settings())
+
+    assert isinstance(llm, AzureChatOpenAI)
+    assert llm.openai_api_key is None
+    assert llm.azure_ad_token_provider is fake_provider
+    mock_token_provider.assert_called_once_with(
+        mock_credential.return_value, "https://cognitiveservices.azure.com/.default"
+    )
+
+
+@patch("scripts.rag_chain.DefaultAzureCredential")
+def test_azure_provider_with_key_does_not_use_identity(mock_credential, monkeypatch):
+    """Avec une clé, aucune identité Entra ID n'est sollicitée."""
+    monkeypatch.setenv("LLM_PROVIDER", "azure_openai")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://exemple.openai.azure.com/")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "cle-de-test")
+
+    llm = get_llm(get_settings())
+
+    assert llm.azure_ad_token_provider is None
+    mock_credential.assert_not_called()
 
 
 def test_azure_provider_uses_deployment_names(monkeypatch):

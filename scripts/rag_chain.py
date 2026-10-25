@@ -11,9 +11,11 @@ Expose une fonction `ask()` réutilisable par l'API et les tests.
 import logging
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
@@ -25,6 +27,7 @@ from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from langfuse import Langfuse
 
 from scripts.config import (
+    AzureOpenAISettings,
     Settings,
     get_azure_openai_settings,
     get_mistral_api_key,
@@ -134,6 +137,25 @@ langfuse = Langfuse(
 )
 
 
+# Périmètre des jetons Entra ID acceptés par Azure OpenAI.
+AZURE_COGNITIVE_SERVICES_SCOPE = "https://cognitiveservices.azure.com/.default"
+
+
+def get_azure_token_provider(azure: AzureOpenAISettings) -> Callable[[], str] | None:
+    """Fournisseur de jetons Entra ID quand Azure OpenAI est appelé sans clé.
+
+    DefaultAzureCredential essaie plusieurs sources : l'identité managée
+    sur Azure, le compte ``az login`` sur le poste. Le jeton est renouvelé
+    automatiquement avant expiration. Avec une clé, renvoie None : le client
+    OpenAI n'utilise alors que la clé.
+    """
+    if azure.api_key:
+        return None
+    return get_bearer_token_provider(
+        DefaultAzureCredential(), AZURE_COGNITIVE_SERVICES_SCOPE
+    )
+
+
 def get_embeddings(settings: Settings) -> Embeddings:
     """Initialise le modèle d'embeddings du fournisseur configuré."""
     if settings.llm_provider == "azure_openai":
@@ -142,6 +164,7 @@ def get_embeddings(settings: Settings) -> Embeddings:
             azure_deployment=settings.embedding_model,
             azure_endpoint=azure.endpoint,
             api_key=azure.api_key,
+            azure_ad_token_provider=get_azure_token_provider(azure),
             api_version=azure.api_version,
             timeout=settings.llm_timeout_seconds,
         )
@@ -167,6 +190,7 @@ def get_llm(settings: Settings) -> BaseChatModel:
             azure_deployment=settings.llm_model,
             azure_endpoint=azure.endpoint,
             api_key=azure.api_key,
+            azure_ad_token_provider=get_azure_token_provider(azure),
             api_version=azure.api_version,
             temperature=settings.llm_temperature,
             max_tokens=settings.llm_max_tokens,

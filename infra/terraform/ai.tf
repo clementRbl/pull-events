@@ -55,3 +55,24 @@ resource "azurerm_cognitive_deployment" "embeddings" {
     capacity = 50
   }
 }
+
+# Audit 4.1 : appeler Azure OpenAI par identité managée plutôt que par clé.
+# Proposition, NON appliquée : le code de l'API sait déjà se passer de
+# AZURE_OPENAI_API_KEY, mais l'image publiée ne le contient pas encore.
+# Marche à suivre : docs/azure/deploiement.md, section « Azure OpenAI sans clé ».
+#
+# 1. Le rôle (gratuit) pour l'identité de la Container App :
+#
+# resource "azurerm_role_assignment" "openai_user_api" {
+#   scope                = azurerm_cognitive_account.ai.id
+#   role_definition_name = "Cognitive Services OpenAI User"
+#   principal_id         = azurerm_container_app.api.identity[0].principal_id
+#   principal_type       = "ServicePrincipal"
+# }
+#
+# 2. Retirer le bloc env AZURE_OPENAI_API_KEY de container_apps.tf et
+#    "azure-openai-api-key" de local.app_secret_names (main.tf).
+# 3. Une fois /ask vérifié sans clé, couper les clés du compte, dans
+#    azurerm_cognitive_account.ai ci-dessus :
+#
+#   local_auth_enabled = false

@@ -30,7 +30,6 @@ from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 # Ajouter la racine du projet au Python path pour importer les modules de scripts/
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -46,11 +45,28 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Limites de débit. Derrière l'ingress Azure, l'IP du client vient de
-# X-Forwarded-For (uvicorn lancé avec --proxy-headers, voir Dockerfile).
+# Limites de débit.
 ASK_LIMIT_PER_IP = "10/minute"
 ASK_LIMIT_PER_KEY = "30/minute"
 REBUILD_LIMIT = "1/day"
+
+
+def client_ip(request: Request) -> str:
+    """Adresse IP du client, pour la limite de débit par IP.
+
+    Derrière l'ingress Azure Container Apps (Envoy), l'adresse réelle du
+    client est la *dernière* de X-Forwarded-For : Envoy l'ajoute à la fin et
+    garde ce que le client a envoyé avant. Prendre la première adresse
+    laisserait un client forger l'en-tête pour contourner la limite
+    (audit du 25/10/2026, point 3.4). Sans en-tête (poste local), c'est
+    l'adresse de la connexion TCP.
+    """
+    forwarded_for = request.headers.get("X-Forwarded-For", "")
+    if forwarded_for:
+        return forwarded_for.rsplit(",", 1)[-1].strip()
+    if request.client is None:
+        return "127.0.0.1"
+    return request.client.host
 
 
 def api_key_bucket(request: Request) -> str:
@@ -59,7 +75,7 @@ def api_key_bucket(request: Request) -> str:
     return hashlib.sha256(provided_key.encode()).hexdigest()[:16]
 
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip)
 
 # Une seule reconstruction à la fois : deux pipelines en parallèle
 # écriraient dans la même table de travail.
