@@ -1,0 +1,10 @@
+# Dossier de travail et état local (l'état réel est dans Azure Storage)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Valeurs propres au poste (abonnement, IP) : seul l'exemple est versionné
+*.tfvars
+!terraform.tfvars.example

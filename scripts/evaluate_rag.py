@@ -8,14 +8,26 @@ la latence, les tokens consommés et le coût.
 Usage :
     uv run python -m scripts.evaluate_rag --backend pgvector
     uv run python -m scripts.evaluate_rag --backend faiss   # référence v1
+
+Mode API : les mêmes questions sont envoyées en HTTP à une API déployée
+(Container Apps, AKS...). On mesure ce que voit un client : code HTTP et
+latence. Pas de juge Ragas dans ce mode : l'API ne renvoie qu'un extrait
+de chaque source, et la qualité est déjà mesurée depuis le poste avec la
+même image, la même base et le même modèle.
+    API_KEY=... uv run python -m scripts.evaluate_rag --api-url https://... \\
+        --output-label aks
 """
 
 import argparse
 import json
 import logging
+import os
 import statistics
+import time
+from dataclasses import dataclass
 from pathlib import Path
 
+import requests
 from langchain_mistralai import ChatMistralAI
 from ragas import EvaluationDataset, RunConfig, SingleTurnSample, evaluate
 from ragas.embeddings import LangchainEmbeddingsWrapper
@@ -94,6 +106,92 @@ def run_rag_on_test_set(
         logger.info("Question %d/%d : %s", i, len(test_set), item["question"])
         results.append((item, answer_question(item["question"], components)))
     return results
+
+
+@dataclass(frozen=True)
+class ApiResult:
+    """Résultat d'une question posée en HTTP à une API déployée."""
+
+    question: str
+    status_code: int
+    seconds: float
+    answer: str
+    sources: list[str]
+
+
+def ask_api(api_url: str, api_key: str, question: str, timeout: float) -> ApiResult:
+    """Envoie une question à POST /ask et mesure la latence vue par le client."""
+    start = time.perf_counter()
+    response = requests.post(
+        f"{api_url.rstrip('/')}/ask",
+        json={"question": question},
+        headers={"X-API-Key": api_key},
+        timeout=timeout,
+    )
+    seconds = time.perf_counter() - start
+    body = response.json() if response.status_code == 200 else {}
+    return ApiResult(
+        question=question,
+        status_code=response.status_code,
+        seconds=seconds,
+        answer=body.get("answer", ""),
+        sources=[source.get("title", "") for source in body.get("sources", [])],
+    )
+
+
+def run_api_on_test_set(
+    test_set: list[dict], api_url: str, api_key: str, pause_seconds: float
+) -> list[ApiResult]:
+    """Pose chaque question à l'API, avec une pause (limite de débit par IP)."""
+    results = []
+    for i, item in enumerate(test_set, 1):
+        logger.info("Question %d/%d : %s", i, len(test_set), item["question"])
+        result = ask_api(api_url, api_key, item["question"], timeout=120)
+        logger.info("HTTP %d en %.2fs", result.status_code, result.seconds)
+        results.append(result)
+        if i < len(test_set):
+            time.sleep(pause_seconds)
+    return results
+
+
+def summarize_api(results: list[ApiResult]) -> dict:
+    """Agrège codes HTTP et latences des questions posées à l'API."""
+    seconds = [r.seconds for r in results]
+    return {
+        "questions": len(results),
+        "http_200": sum(1 for r in results if r.status_code == 200),
+        "latency_seconds": {
+            "total_mean": round(_mean(seconds), 3),
+            "total_p50": round(statistics.median(seconds), 3),
+            "total_p95": round(_percentile_95(seconds), 3),
+        },
+    }
+
+
+def save_api_results(label: str, api_url: str, results: list[ApiResult]) -> Path:
+    """Écrit le résumé et le détail par question dans docs/evaluation/."""
+    report = {
+        "label": label,
+        "mode": "api",
+        "api_url": api_url,
+        "summary": summarize_api(results),
+        "details": [
+            {
+                "question": r.question,
+                "status_code": r.status_code,
+                "seconds": round(r.seconds, 3),
+                "answer": r.answer,
+                "sources": r.sources,
+            }
+            for r in results
+        ],
+    }
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    output_file = RESULTS_DIR / f"results_{label}.json"
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    return output_file
 
 
 def build_judge(settings: Settings) -> LangchainLLMWrapper:
@@ -270,10 +368,38 @@ def main():
         default=20,
         help="Nombre maximum de questions évaluées (le juge est facturé par question)",
     )
+    parser.add_argument(
+        "--api-url",
+        default=None,
+        help="Mode API : URL d'une API déployée (clé lue dans la variable API_KEY)",
+    )
+    parser.add_argument(
+        "--pause-seconds",
+        type=float,
+        default=7.0,
+        help="Mode API : pause entre deux questions (10 questions/min par IP)",
+    )
     args = parser.parse_args()
 
     test_set = load_test_set()[: args.max_questions]
     logger.info("%d questions retenues", len(test_set))
+
+    if args.api_url:
+        api_key = os.getenv("API_KEY")
+        if not api_key:
+            msg = "API_KEY doit être définie dans l'environnement en mode API"
+            raise ValueError(msg)
+        api_results = run_api_on_test_set(
+            test_set, args.api_url, api_key, args.pause_seconds
+        )
+        label = args.output_label or "api"
+        output_file = save_api_results(label, args.api_url, api_results)
+        print("\n" + "=" * 60)
+        print(f"RÉSULTATS API ({label})")
+        print("=" * 60)
+        print(json.dumps(summarize_api(api_results), indent=2, ensure_ascii=False))
+        logger.info("Résultats sauvegardés dans %s", output_file)
+        return
 
     # Base chargée avant les questions, pour ne pas chronométrer le démarrage
     components = load_components(args.backend)

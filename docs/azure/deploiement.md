@@ -1,6 +1,6 @@
 # Déploiement sur Azure
 
-Déploiement manuel, avec la CLI `az`, réalisé le 24 octobre 2026. Ce document est l'inventaire exact de ce qui a été créé et de ses réglages : il servira de cahier des charges à la version Terraform.
+Déploiement manuel, avec la CLI `az`, réalisé le 24 octobre 2026. Ce document est l'inventaire exact de ce qui a été créé et de ses réglages. Depuis le 25 octobre, la même infrastructure est décrite et gérée par Terraform ([terraform.md](terraform.md)) et l'API tourne aussi sur Kubernetes ([kubernetes.md](kubernetes.md)) : les valeurs ci-dessous restent la référence historique, les valeurs courantes sont dans `infra/terraform/`.
 
 ## Architecture
 
@@ -35,20 +35,20 @@ Toutes dans l'abonnement « Azure subscription 1 » (essai gratuit), groupe de r
 | Ressource | Nom | Réglages |
 |---|---|---|
 | Groupe de ressources | `rg-pull-events` | France Central |
-| Budget | `budget-pull-events` (niveau abonnement) | 10 par mois dans la devise de facturation, du 01/10/2026 au 31/10/2027 ; e-mail aux propriétaires à 50 %, 80 %, 100 % réels et 100 % prévus |
-| Key Vault | `kv-pull-events-cr24` | Standard, autorisation **RBAC**, suppression réversible 7 jours |
+| Budget | `budget-pull-events` (niveau abonnement) | 10 par mois dans la devise de facturation, du 01/10/2026 au 31/10/2027 ; e-mail aux propriétaires et à une adresse explicite à 50 %, 80 %, 100 % réels et 100 % prévus. Un budget alerte, il ne bloque rien |
+| Key Vault | `kv-pull-events-cr24` | Standard, autorisation **RBAC**, suppression réversible 7 jours, protection contre la purge depuis l'audit du 25/10 |
 | Foundry (Azure AI Services) | `ais-pull-events-cr24` | Type `AIServices`, SKU S0, sous-domaine `ais-pull-events-cr24` (point de terminaison `https://ais-pull-events-cr24.openai.azure.com/`) |
-| Déploiement | `gpt-4.1-mini` | Modèle `gpt-4.1-mini` version `2025-04-14`, SKU **Standard**, capacité 50 (50 000 tokens/minute), filtre de contenu `Microsoft.DefaultV2` |
-| Déploiement | `text-embedding-3-small` | Modèle `text-embedding-3-small` version `1`, SKU **DataZoneStandard**, capacité 350 (350 000 tokens/minute), filtre `Microsoft.DefaultV2` |
+| Déploiement | `gpt-4.1-mini` | Modèle `gpt-4.1-mini` version `2025-04-14`, SKU **Standard**, capacité 50 à la création, **20** (20 000 tokens/minute) depuis l'audit du 25/10, filtre de contenu `Microsoft.DefaultV2` |
+| Déploiement | `text-embedding-3-small` | Modèle `text-embedding-3-small` version `1`, SKU **DataZoneStandard**, capacité 350 à la création, **50** depuis l'audit du 25/10, filtre `Microsoft.DefaultV2` |
 | PostgreSQL Flexible Server | `psql-pull-events-cr24` | PostgreSQL 17, Burstable **Standard_B1ms** (1 vCore, 2 Go), 32 Go de stockage, sauvegardes 7 jours, sans haute disponibilité, utilisateur `pgadmin`, accès public |
 | Paramètre serveur | `azure.extensions` | `VECTOR` (pgvector doit être autorisé avant `CREATE EXTENSION`) |
-| Règles de pare-feu | `allow-azure-services` (0.0.0.0) et `FirewallIPAddress_…` (IP du poste) | La première laisse entrer les services Azure, dont Container Apps : **risque résiduel**, voir [Sécurité](#sécurité) |
+| Règles de pare-feu | `allow-azure-services` (0.0.0.0) et `FirewallIPAddress_…` (IP du poste) | La première laisse entrer les services Azure, dont Container Apps : **risque résiduel**, voir [Sécurité](#sécurité). Terraform la supprime dès que le réseau privé est activé (`private_network = true`) |
 | Base de données | `pullevents` | Extension `vector` 0.8.7 ; tables `event_chunks` (Azure OpenAI, 1536 dimensions) et `event_chunks_mistral` (copie de la base locale, 1024 dimensions), index HNSW sur chacune ; `CONNECT` retiré à `PUBLIC` |
 | Rôle PostgreSQL | `pullevents_app` | Utilisé par l'API : `CONNECT` sur `pullevents`, `USAGE` sur `public`, **`SELECT` seulement** sur les tables, y compris celles recréées plus tard par `pgadmin` (`ALTER DEFAULT PRIVILEGES`) |
-| Log Analytics | `log-pull-events` | Rétention 30 jours ; reçoit les journaux des conteneurs |
+| Log Analytics | `log-pull-events` | Rétention 30 jours ; reçoit les journaux des conteneurs ; plafond d'ingestion 0,5 Go/jour depuis l'audit du 25/10 |
 | Environnement Container Apps | `cae-pull-events` | Plan Consommation, journaux vers `log-pull-events` |
 | Container App | `ca-pull-events-api` | Image `ghcr.io/clementrbl/pull-events:0.2.1-azure`, 0,5 vCPU, 1 Go, **0 à 1 réplica** (mise à zéro sans trafic), ingress externe HTTPS vers le port 8000, mode de révision unique, identité managée système |
-| Attribution de rôle | `Key Vault Secrets User` | Identité de `ca-pull-events-api` sur `kv-pull-events-cr24` |
+| Attribution de rôle | `Key Vault Secrets User` | Identité de `ca-pull-events-api`, sur chacun des cinq secrets qu'elle lit (sur tout le coffre à la création, restreint par l'audit du 25/10) |
 | Attribution de rôle | `Key Vault Secrets Officer` | Ton compte sur `kv-pull-events-cr24` (pour écrire les secrets) |
 
 ### Secrets du Key Vault
@@ -96,7 +96,7 @@ Mesures appliquées après l'audit du 25/10/2026 :
 | Clés partagées entre environnements | Clé Mistral retirée du coffre ; projet Langfuse Cloud réservé à Azure (le local retrouve son Langfuse auto-hébergé) |
 | Clé d'API vue en clair pendant les tests | Clé renouvelée |
 
-**Risque résiduel accepté : la règle `allow-azure-services`.** Elle autorise le port 5432 depuis toute adresse Azure, y compris d'autres clients. Restent exigés : TLS, un mot de passe aléatoire de 35 caractères et, pour l'API, un rôle en lecture seule. En plan Consommation sans réseau virtuel, Container Apps n'a pas d'adresse sortante fixe (`outboundIpAddresses` vide), donc impossible de la mettre seule en liste blanche. La vraie correction est un réseau virtuel (environnement Container Apps intégré au VNet, PostgreSQL en accès privé) : **prévue à l'étape Terraform**, quand l'infrastructure sera recréée. Pas fait non plus : restriction d'IP sur l'ingress (la démo doit rester joignable), accès sans clé à Azure OpenAI par identité managée (voir la fiche AI-103).
+**Risque résiduel accepté : la règle `allow-azure-services`.** Elle autorise le port 5432 depuis toute adresse Azure, y compris d'autres clients. Restent exigés : TLS, un mot de passe aléatoire de 35 caractères et, pour l'API, un rôle en lecture seule. En plan Consommation sans réseau virtuel, les adresses sortantes de Container Apps ne sont pas garanties stables (une liste d'adresses partagées, qui peut changer), donc impossible de les mettre seules en liste blanche de façon fiable. La vraie correction est un réseau virtuel (environnement Container Apps intégré au VNet, PostgreSQL joint par un point de terminaison privé) : écrite en Terraform (`network.tf`, bascule `private_network`), coût ≈ 7 €/mois, **non activée** le 25/10/2026 (aucun crédit Azure, règle zéro dépense ; détail et options chiffrées dans [terraform.md](terraform.md)). Pas fait non plus : restriction d'IP sur l'ingress (la démo doit rester joignable), accès sans clé à Azure OpenAI par identité managée (voir la fiche AI-103).
 
 Renouveler la clé d'API :
 
@@ -121,7 +121,7 @@ Prix de détail relevés le 24/10/2026 sur l'[API publique des prix Azure](https
 | `text-embedding-3-small` Data Zone | ≈ 0,022 $ par million de tokens (l'API des prix n'a pas de ligne Data Zone : 0,020 $ en Global, 0,022 à 0,027 $ en régional) | indexation complète ≈ 0,3 $, une fois | sur le crédit |
 | **Total** | | **≈ 16 €/mois** | **≈ 0 à 2 €/mois** |
 
-Le crédit d'essai (200 $, 30 jours) couvre largement le premier mois. Après 30 jours, il faut passer au paiement à l'utilisation pour garder les services gratuits 12 mois : sinon Azure désactive l'abonnement.
+D'après l'API Azure (audit du 25/10/2026), l'abonnement est au **paiement à l'utilisation** (`PayAsYouGo`, limite de dépense désactivée, carte active) et aucun crédit n'est visible ; les 12 mois de services gratuits ne sont pas vérifiables par l'API. Confirmé sur le portail le 25/10/2026 : aucun crédit, mais les **12 mois de services gratuits** (jusqu'au 24/10/2027) couvrent PostgreSQL Burstable 750 h/mois, 32 Go de stockage et 32 Go de sauvegarde : la base ne coûte rien pendant un an.
 
 ## Reproduire le déploiement
 

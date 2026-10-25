@@ -1,0 +1,31 @@
+{{- if .Values.networkPolicy.enabled }}
+# Entrée : seulement le contrôleur d'ingress, sur le port de l'API.
+# Sortie : DNS, puis HTTPS (Azure OpenAI, Langfuse, Key Vault) et PostgreSQL.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "pull-events.name" . }}
+  labels:
+    {{- include "pull-events.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "pull-events.selectorLabels" . | nindent 6 }}
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingressNamespace }}
+      ports:
+        - port: 8000
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - ports:
+        - port: 443
+        - port: 5432
+{{- end }}

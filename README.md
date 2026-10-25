@@ -6,6 +6,8 @@ La version 1.1 remplace l'index Faiss par **PostgreSQL + pgvector** et ajoute **
 
 La version 1.2 tourne aussi sur **Azure** : Container Apps, Azure OpenAI (Foundry), PostgreSQL Flexible Server + pgvector, Key Vault. Voir [docs/azure/deploiement.md](docs/azure/deploiement.md).
 
+La version 1.3 décrit toute cette infrastructure en **Terraform** (ressources importées, `terraform plan` vide, durcissement après audit) et déploie la même API sur **Kubernetes** avec un chart Helm, sur kind en local puis sur AKS. Voir [docs/azure/terraform.md](docs/azure/terraform.md) et [docs/azure/kubernetes.md](docs/azure/kubernetes.md).
+
 ## Stack technique
 
 | Composant | Technologie |
@@ -20,6 +22,8 @@ La version 1.2 tourne aussi sur **Azure** : Container Apps, Azure OpenAI (Foundr
 | Dépendances | uv (`pyproject.toml` + `uv.lock`) |
 | Conteneurisation | Docker Compose ; image publiée sur GHCR |
 | Cloud | Azure Container Apps, Azure OpenAI (Foundry), PostgreSQL Flexible Server, Key Vault |
+| Infrastructure as code | Terraform 1.17, provider azurerm 5 (`infra/terraform/`) |
+| Kubernetes | Chart Helm (`k8s/pull-events/`), kind en local, AKS sur Azure |
 
 ## Architecture du système
 
@@ -230,6 +234,8 @@ Le script pose les 20 questions de `data/test_questions.json` (`--max-questions`
 | Latence | Embedding de la question, recherche vectorielle, génération |
 | Tokens et coût | Par question, et extrapolé à 1 000 questions |
 
+Mode API (`--api-url https://… --output-label aks`, clé dans `API_KEY`) : les mêmes questions sont envoyées en HTTP à une API déployée, pour mesurer ce que voit un client (code HTTP, latence moyenne, médiane, p95). Pas de juge dans ce mode : l'API ne renvoie qu'un extrait des sources.
+
 Le résumé et le détail par question sont écrits dans `docs/evaluation/results_<backend>.json`.
 
 ### Résultats avant/après
@@ -294,13 +300,18 @@ pull-events/
 │   ├── build_index.py         # Embeddings → pgvector
 │   ├── vector_db.py           # Table pgvector, index HNSW, échange de tables
 │   ├── rag_chain.py           # Chaîne RAG instrumentée (Langfuse)
-│   ├── evaluate_rag.py        # Ragas + latence + coûts
+│   ├── evaluate_rag.py        # Ragas + latence + coûts ; mode --api-url
 │   ├── faiss_baseline.py      # Index Faiss de référence (dev)
 │   └── check_imports.py       # Vérification de l'environnement
 ├── tests/                     # pytest
 ├── data/test_questions.json   # Jeu de test annoté (20 questions)
+├── infra/terraform/           # Infrastructure Azure en Terraform (import, réseau privé, AKS)
+├── k8s/
+│   ├── pull-events/           # Chart Helm (Deployment, Service, Ingress, HPA, NetworkPolicy, CSI Key Vault)
+│   ├── kind/cluster.yaml      # Cluster local
+│   └── cert-manager/          # ClusterIssuer Let's Encrypt
 ├── docs/
-│   ├── azure/                 # Ressources Azure, commandes, coût, destruction ; fiche AI-103
+│   ├── azure/                 # Déploiement, Terraform, Kubernetes, coût, destruction ; fiche AI-103
 │   ├── evaluation/            # Méthode, résultats avant/après (JSON par configuration)
 │   ├── article-blog.md        # Brouillon d'article
 │   └── architecture.mmd

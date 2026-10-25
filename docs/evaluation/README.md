@@ -110,3 +110,7 @@ Langfuse auto-hébergé (web, worker, ClickHouse, PostgreSQL, Redis, MinIO) occu
 - Colonnes Azure : le RAG tourne sur le PC et interroge les ressources Azure. La latence vue par un utilisateur est celle de l'API déployée, mesurée à part en HTTP.
 - La colonne B change le LLM et les embeddings en même temps : une colonne intermédiaire (Ministral avec `text-embedding-3-small`) séparerait les deux effets.
 - Le modèle du RAG a dû passer de `mistral-small-latest` (v1) à `ministral-8b-latest` : la clé API utilisée n'a pas de quota sur les modèles Small et Medium. Les trois colonnes utilisent le même modèle, la comparaison reste valable.
+
+## Kubernetes
+
+La même image tourne sur un cluster kind local avec le chart `k8s/pull-events` ([docs/azure/kubernetes.md](../azure/kubernetes.md)) : une question de contrôle y a répondu en 6,6 s avec 5 sources (0,0009 $), le pod parlant à la base et aux modèles Azure. Pas de colonne dédiée : l'infrastructure d'exécution ne change ni les vecteurs ni le modèle (c'est ce que montre déjà la colonne Azure A), et AKS n'a pas été créé (aucun crédit Azure, règle zéro dépense). Pour mesurer une API déployée depuis un client : `scripts/evaluate_rag.py --api-url <URL> --output-label <nom>` (codes HTTP, latence moyenne, médiane, p95 ; sans juge, l'API ne renvoyant qu'un extrait des sources).

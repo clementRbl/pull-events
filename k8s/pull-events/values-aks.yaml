@@ -1,0 +1,11 @@
+# AKS : secrets lus dans Key Vault par le pilote CSI, TLS Let's Encrypt.
+secrets:
+  source: keyvault
+  keyVault:
+    name: kv-pull-events-cr24
+    # tenantId et clientId : passés par --set depuis les sorties Terraform
+ingress:
+  host: pull-events-cr24.francecentral.cloudapp.azure.com
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt-prod

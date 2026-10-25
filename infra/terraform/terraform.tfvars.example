@@ -1,0 +1,4 @@
+# Copier en terraform.tfvars (ignoré par git) et remplir.
+subscription_id = "00000000-0000-0000-0000-000000000000" # az account show --query id -o tsv
+workstation_ip  = "203.0.113.10"                         # curl -s https://api.ipify.org
+budget_email    = "vous@example.com"                     # alertes de budget

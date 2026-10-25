@@ -38,3 +38,7 @@ data/*.json
 
 # === Logs ===
 *.log
+
+# === Terraform (voir infra/terraform/.gitignore) ===
+infra/terraform/.terraform/
+infra/terraform/*.tfstate*

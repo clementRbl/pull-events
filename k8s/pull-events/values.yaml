@@ -1,0 +1,68 @@
+# Valeurs par défaut. Surchargées par values-kind.yaml (local) et values-aks.yaml (Azure).
+
+image:
+  repository: ghcr.io/clementrbl/pull-events
+  tag: 0.2.1-azure
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# Configuration non secrète, injectée en variables d'environnement (ConfigMap).
+config:
+  LLM_PROVIDER: azure_openai
+  AZURE_OPENAI_ENDPOINT: https://ais-pull-events-cr24.openai.azure.com/
+  LLM_MODEL: gpt-4.1-mini
+  EMBEDDING_MODEL: text-embedding-3-small
+  EMBEDDING_SIZE: "1536"
+  VECTOR_TABLE: event_chunks
+  LLM_INPUT_PRICE_PER_MTOK: "0.484"
+  LLM_OUTPUT_PRICE_PER_MTOK: "1.936"
+  EMBEDDING_PRICE_PER_MTOK: "0.022"
+  ENABLE_REBUILD: "false"
+  LANGFUSE_BASE_URL: https://cloud.langfuse.com
+
+# Secrets attendus dans un Secret Kubernetes dont les clés sont les noms des
+# variables : DATABASE_URL, API_KEY, AZURE_OPENAI_API_KEY, LANGFUSE_PUBLIC_KEY,
+# LANGFUSE_SECRET_KEY.
+secrets:
+  # "existing" : le Secret est créé à la main (kind).
+  # "keyvault" : le pilote CSI Secrets Store le remplit depuis Azure Key Vault (AKS).
+  source: existing
+  name: pull-events-secrets
+  keyVault:
+    name: kv-pull-events-cr24
+    tenantId: ""
+    # Identité managée de l'add-on CSI (sortie Terraform aks_kv_identity_client_id)
+    clientId: ""
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+# Montée en charge automatique sur le CPU.
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+service:
+  port: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  host: pull-events.localtest.me
+  tls:
+    enabled: false
+    secretName: pull-events-tls
+    clusterIssuer: letsencrypt-prod
+
+networkPolicy:
+  enabled: true
+  # Namespace du contrôleur d'ingress autorisé à joindre l'API
+  ingressNamespace: ingress-nginx
