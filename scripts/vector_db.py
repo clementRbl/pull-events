@@ -7,6 +7,7 @@ dans une table de travail, puis l'échange avec la table servie en une seule
 transaction : l'API continue de répondre pendant toute l'indexation.
 """
 
+import json
 import logging
 
 import sqlalchemy
@@ -127,3 +128,41 @@ def publish_staging_store(settings: Settings, store: PGVectorStore) -> None:
     finally:
         engine.dispose()
     logger.info("Table %s mise en service", served)
+
+
+def fetch_known_embeddings(
+    settings: Settings, source_table: str, texts: list[str]
+) -> dict[str, list[float]]:
+    """Récupère dans une autre table les vecteurs déjà calculés pour ces textes.
+
+    Sert à indexer une variante de découpage sans repayer les embeddings des
+    chunks identiques d'une table à l'autre.
+
+    Args:
+        settings: Paramètres (adresse de la base).
+        source_table: Table déjà indexée avec le même modèle d'embeddings.
+        texts: Textes des chunks à indexer.
+
+    Returns:
+        Vecteur de chaque texte trouvé dans source_table, par texte.
+
+    Raises:
+        ValueError: Si source_table n'est pas un nom de table simple.
+    """
+    # Le nom de table est inséré tel quel dans le SQL, comme VECTOR_TABLE.
+    if not source_table.isidentifier():
+        msg = f"Table source invalide : {source_table!r}"
+        raise ValueError(msg)
+
+    query = sqlalchemy.text(
+        f"SELECT DISTINCT ON (content) content, embedding::text "  # noqa: S608
+        f"FROM {source_table} WHERE content = ANY(:texts)"
+    )
+    engine = sqlalchemy.create_engine(settings.database_url)
+    try:
+        with engine.connect() as connection:
+            rows = connection.execute(query, {"texts": texts}).all()
+    finally:
+        engine.dispose()
+    # pgvector écrit un vecteur sous la forme « [0.1,0.2,...] », du JSON valide.
+    return {content: json.loads(vector) for content, vector in rows}

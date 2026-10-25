@@ -57,6 +57,41 @@ def test_settings_reject_unknown_llm_provider():
             get_settings()
 
 
+def test_anthropic_provider_answers_without_temperature(monkeypatch):
+    """Claude comme LLM de réponse : pas de temperature (refusée par l'API),
+    réflexion minimale, et embeddings Mistral inchangés (mêmes vecteurs)."""
+    from langchain_anthropic import ChatAnthropic
+    from langchain_mistralai import MistralAIEmbeddings
+
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.setenv("LLM_MODEL", "claude-haiku-5-5")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "cle-de-test")
+    monkeypatch.setenv("MISTRAL_API_KEY", "cle-de-test")
+    settings = get_settings()
+
+    llm = get_llm(settings)
+    assert isinstance(llm, ChatAnthropic)
+    assert llm.temperature is None
+    assert llm.reasoning_effort == "low"
+    assert isinstance(get_embeddings(settings), MistralAIEmbeddings)
+
+
+def test_generate_keeps_only_the_text_of_the_answer():
+    """Les blocs de réflexion de Claude ne finissent pas dans la réponse."""
+    from scripts.rag_chain import _generate
+
+    llm = MagicMock()
+    llm.invoke.return_value = AIMessage(
+        content=[
+            {"type": "thinking", "thinking": "", "signature": "x"},
+            {"type": "text", "text": "Voici trois concerts."},
+        ]
+    )
+    components = MagicMock(llm=llm)
+    answer, _, _ = _generate(components, [])
+    assert answer == "Voici trois concerts."
+
+
 def test_azure_provider_requires_endpoint(monkeypatch):
     """Azure OpenAI sans point de terminaison : erreur claire, pas d'appel réseau."""
     monkeypatch.setenv("LLM_PROVIDER", "azure_openai")

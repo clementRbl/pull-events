@@ -35,7 +35,7 @@ graph TB
 
     subgraph "Pipeline d'ingestion"
         FE["fetch_events.py<br/>Pagination curseur date<br/>Filtre : IDF, < 1 an"]
-        PD["prepare_data.py<br/>Nettoyage HTML<br/>Déduplication<br/>Chunking 2000 chars"]
+        PD["prepare_data.py<br/>Nettoyage HTML<br/>Déduplication<br/>Chunks ≤ 2 000 caractères"]
         BI["build_index.py<br/>Embeddings Mistral<br/>Batch 50 + retry<br/>Table de travail puis échange"]
     end
 
@@ -125,11 +125,12 @@ Tout ce qui change d'un environnement à l'autre passe par des variables d'envir
 
 | Variable | Défaut | Rôle |
 |----------|--------|------|
-| `LLM_PROVIDER` | `mistral` | Fournisseur du LLM et des embeddings : `mistral` ou `azure_openai` |
+| `LLM_PROVIDER` | `mistral` | Fournisseur du LLM et des embeddings : `mistral` ou `azure_openai`. `anthropic` (Claude répond, embeddings Mistral) sert seulement à l'évaluation |
 | `MISTRAL_API_KEY` | — | Clé API Mistral (obligatoire avec `mistral`) |
 | `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY` / `AZURE_OPENAI_API_VERSION` | — / — / `2024-10-21` | Accès Azure OpenAI. `LLM_MODEL` et `EMBEDDING_MODEL` désignent alors les noms des déploiements. Sans `AZURE_OPENAI_API_KEY`, authentification par identité Entra ID (`DefaultAzureCredential` : identité managée sur Azure, `az login` sur le poste ; rôle `Cognitive Services OpenAI User` requis) |
 | `DATABASE_URL` | `postgresql+psycopg://pullevents:pullevents@localhost:5432/pullevents` | Base pgvector |
 | `VECTOR_TABLE` | `event_chunks` | Table des chunks |
+| `CHUNKING` | `ligne-plafond` | Découpage des événements par `prepare_data` : `ligne`, `ligne-plafond` ou `phrase-recoupement` ([comparaison](docs/evaluation/README.md#trois-découpages-comparés)) |
 | `LLM_MODEL` / `EMBEDDING_MODEL` / `EMBEDDING_SIZE` | `ministral-8b-latest` / `mistral-embed` / `1024` | Modèles (changer d'embeddings impose de réindexer) |
 | `TOP_K` | `5` | Nombre de chunks envoyés au LLM |
 | `HNSW_EF_SEARCH` | `100` | Candidats explorés par l'index HNSW (rappel@5 : 0,91 à 40, 0,99 à 100) |
@@ -261,12 +262,35 @@ En résumé :
 - **Le serveur PostgreSQL B1ms est trop petit pour garder les index en mémoire** : la recherche passe de 5 ms à plusieurs centaines de millisecondes, encore loin derrière les 2,6 s de génération.
 - **Évaluer coûte plus cher que répondre** : environ 0,12 $ de juge par évaluation, contre 0,0034 $ pour les 20 réponses.
 
+### Trois découpages comparés
+
+Même jeu, même juge, en local, deux passages par variante ([détail et décision](docs/evaluation/README.md#trois-découpages-comparés)) :
+
+| | `ligne` (v1) | **`ligne-plafond`** (par défaut) | `phrase-recoupement` |
+|---|---|---|---|
+| Faithfulness | 0,892 | 0,885 | 0,911 |
+| Answer relevancy | 0,790 | 0,836 | 0,835 |
+| Context precision | 0,466 | 0,559 | 0,494 |
+| Chunks au-delà de 2 000 caractères | 1 414 (jusqu'à 9 837) | 0 | 0 |
+| Tokens d'entrée par question | 1 392 | 1 177 | 1 357 |
+
+- **Aucun découpage ne gagne en fidélité au-delà du bruit du juge** (± 0,06) : le recoupement par phrase n'apporte rien de mesurable sur ces questions.
+- **`ligne-plafond` est gardé, comme le plus simple** : le code de la v1 avec une coupe entre deux mots au-delà de 2 000 caractères, et 15 % de tokens en moins par question.
+- **Claude Haiku comme modèle de réponse** : fidélité 0,928, encore dans le bruit (et noté par lui-même), pour un coût 3,9 fois plus élevé.
+
 ## Pipeline de données
 
 ```bash
 uv run python -m scripts.fetch_events   # API Open Agenda → data/raw_events.json
 uv run python -m scripts.prepare_data   # nettoyage + chunking → data/chunks.json
 uv run python -m scripts.build_index    # embeddings → PostgreSQL + pgvector
+```
+
+Pour indexer un autre découpage dans sa propre table sans repayer les embeddings des chunks identiques (près de 90 % d'entre eux ici) :
+
+```bash
+CHUNKING=phrase-recoupement uv run python -m scripts.prepare_data
+VECTOR_TABLE=event_chunks_phrase_recoupement uv run python -m scripts.build_index --reuse-from event_chunks
 ```
 
 L'ancien index Faiss reste reconstructible pour comparer (dépendances de dev) :
@@ -286,7 +310,7 @@ uv run python -m scripts.evaluate_rag --backend faiss
 - **Prix** : les tarifs Mistral par défaut sont à vérifier sur la page officielle et à ajuster dans `.env`.
 - **Limite de débit en mémoire** : valable avec un seul réplica (c'est le cas sur Azure, 0 à 1). Au-delà, il faudrait un stockage partagé (Redis).
 - **`/rebuild` synchrone** : la requête attend la fin du pipeline. Un traitement en tâche de fond (202 puis suivi) serait plus propre ; la route est de toute façon désactivée hors poste local.
-- **Chunks longs** : les descriptions sont découpées par ligne, et le HTML nettoyé n'en contient presque plus. Certains chunks font donc près de 10 000 caractères (4 800 tokens au plus après normalisation Unicode).
+- **Découpage simple** : `ligne-plafond` coupe entre deux lignes, puis entre deux mots au-delà de 2 000 caractères, sans recoupement. Un découpage par phrases avec recoupement et en-tête répété (`phrase-recoupement`) a été mesuré : pas mieux au-delà du bruit du juge ([comparaison](docs/evaluation/README.md#trois-découpages-comparés)).
 
 ## Structure du projet
 

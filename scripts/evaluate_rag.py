@@ -334,6 +334,7 @@ def save_results(
         "llm_model": settings.llm_model,
         "judge_model": settings.judge_model,
         "embedding_model": settings.embedding_model,
+        "vector_table": settings.vector_table if backend == "pgvector" else None,
         "top_k": settings.top_k,
         "hnsw_ef_search": settings.hnsw_ef_search if backend == "pgvector" else None,
         "summary": summarize(results, scores),

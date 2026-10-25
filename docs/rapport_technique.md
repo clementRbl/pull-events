@@ -92,7 +92,9 @@ Conditions : {conditions}
 Description : {description} {longdescription}
 ```
 
-Les textes dépassant **2 000 caractères** sont découpés en chunks plus petits avec recoupement par phrase. Ce seuil a été choisi pour rester sous la fenêtre de contexte du modèle d'embedding tout en conservant un contexte suffisant par chunk.
+Les textes dépassant **2 000 caractères** sont découpés en chunks plus petits, en regroupant leurs lignes. Ce seuil a été choisi pour rester sous la fenêtre de contexte du modèle d'embedding tout en conservant un contexte suffisant par chunk.
+
+> **Erratum (25 octobre 2026).** La première version de ce rapport annonçait un « recoupement par phrase ». C'était faux : le code coupait entre deux lignes, sans recoupement, et une ligne de plus de 2 000 caractères n'était pas coupée. Comme le HTML nettoyé ne contient presque plus de sauts de ligne, dans la base actuelle, 1 414 chunks sur 39 089 dépassaient 2 000 caractères (jusqu'à 9 837). Un découpage par phrases avec recoupement a depuis été écrit et mesuré contre deux autres (section 12) : il n'apporte rien au-delà du bruit du juge, et c'est le découpage par lignes avec plafond de 2 000 caractères qui a été retenu.
 
 **Résultat** : 17 383 chunks → `data/chunks.json`
 
@@ -474,3 +476,17 @@ Corrections faites au passage :
 - Certaines descriptions contiennent des lettres « gras mathématiques » (𝗣𝗥𝗢𝗚𝗥𝗔𝗠𝗠𝗘) copiées des réseaux sociaux. Chacune coûte plusieurs tokens, et un chunk de 4 306 caractères atteignait 9 138 tokens, au-delà de la limite de 8 192 de `mistral-embed`. La normalisation NFKC le ramène à 1 709 tokens.
 
 Résultats avant/après (mêmes vecteurs, même LLM, même juge) : qualité inchangée aux erreurs de mesure près, recherche 3 fois plus rapide (14,8 → 5,6 ms), coût identique (0,17 $ pour 1 000 questions). Détail dans [docs/evaluation/README.md](evaluation/README.md).
+
+---
+
+## 12. Évolution : trois découpages comparés
+
+Le découpage est maintenant choisi par la variable `CHUNKING` de `scripts/prepare_data.py` :
+
+| Variante | Principe |
+|---|---|
+| `ligne` | Découpage de la v1 : lignes regroupées jusqu'à 2 000 caractères, une ligne plus longue n'est pas coupée |
+| `ligne-plafond` (par défaut) | Même découpe, une ligne trop longue est coupée entre deux mots : aucun chunk au-delà de 2 000 caractères |
+| `phrase-recoupement` | En-tête (titre, dates, lieu) répété dans chaque chunk, phrases entières, les deux dernières phrases d'un chunk reprises au début du suivant |
+
+Les trois variantes ont été indexées chacune dans sa propre table pgvector, puis évaluées deux fois sur les 20 mêmes questions avec le même juge. Fidélité : 0,892, 0,885 et 0,911, des écarts inférieurs au bruit du juge (± 0,06). La variante la plus simple, `ligne-plafond`, est retenue : même qualité, aucun chunk trop long, 15 % de tokens en moins par question. Les chunks identiques d'une variante à l'autre reprennent leurs vecteurs (`build_index.py --reuse-from`) : 7 920 embeddings calculés au lieu de 80 647. Détail : [docs/evaluation/README.md](evaluation/README.md#trois-découpages-comparés).

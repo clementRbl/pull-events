@@ -2,7 +2,7 @@
 Chaîne RAG (Retrieval-Augmented Generation) pour Puls-Events.
 
 Assemble le pipeline complet : recherche vectorielle + génération de
-réponse via un LLM (Mistral, ou Azure OpenAI selon LLM_PROVIDER). Chaque
+réponse via un LLM (Mistral, Azure OpenAI ou Claude selon LLM_PROVIDER). Chaque
 question est tracée dans Langfuse (latence, tokens, coût) quand les clés
 Langfuse sont configurées.
 Expose une fonction `ask()` réutilisable par l'API et les tests.
@@ -196,6 +196,20 @@ def get_llm(settings: Settings) -> BaseChatModel:
             max_tokens=settings.llm_max_tokens,
             timeout=settings.llm_timeout_seconds,
         )
+    if settings.llm_provider == "anthropic":
+        # Import local : langchain-anthropic n'est installé qu'en dev, pour
+        # l'évaluation (comparaison avec Claude Haiku). La clé est lue dans
+        # ANTHROPIC_API_KEY. Pas de temperature : l'API Claude la refuse.
+        from langchain_anthropic import ChatAnthropic
+
+        return ChatAnthropic(
+            model=settings.llm_model,
+            max_tokens=settings.llm_max_tokens,
+            # Réflexion minimale : une réponse de RAG n'en demande pas plus,
+            # et chaque token de réflexion est facturé en sortie.
+            effort="low",
+            timeout=settings.llm_timeout_seconds,
+        )
     return ChatMistralAI(
         model=settings.llm_model,
         api_key=get_mistral_api_key(),
@@ -284,8 +298,9 @@ def _generate(
     """Appelle le LLM et renvoie (réponse, tokens d'entrée, tokens de sortie)."""
     response = components.llm.invoke(messages)
     usage = response.usage_metadata or {}
+    # .text ne garde que le texte : Claude renvoie aussi des blocs de réflexion
     return (
-        str(response.content),
+        response.text,
         usage.get("input_tokens", 0),
         usage.get("output_tokens", 0),
     )
