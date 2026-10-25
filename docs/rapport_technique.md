@@ -94,6 +94,8 @@ Description : {description} {longdescription}
 
 Les textes dépassant **2 000 caractères** sont découpés en chunks plus petits avec recoupement par phrase. Ce seuil a été choisi pour rester sous la fenêtre de contexte du modèle d'embedding tout en conservant un contexte suffisant par chunk.
 
+> **Erratum (25/10/2026).** Le paragraphe ci-dessus ne décrit pas le code. `split_text_into_chunks` (`scripts/prepare_data.py`) découpe aux sauts de ligne, **sans recoupement** entre chunks, et ne redécoupe pas une ligne plus longue que la limite : celle-ci devient un chunk à elle seule. Sur la base du 24/10/2026, **1 414 chunks sur 39 089 dépassent 2 000 caractères**, le plus long en compte **9 837**. Ils restent sous la limite du modèle d'embedding (8 192 tokens), donc l'index est valide ; le découpage n'a pas été modifié.
+
 **Résultat** : 17 383 chunks → `data/chunks.json`
 
 ### Embedding

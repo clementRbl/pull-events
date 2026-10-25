@@ -1,6 +1,6 @@
 # Kubernetes : kind en local, AKS sur Azure
 
-La même API est déployée sur Kubernetes avec un chart Helm, `k8s/pull-events/`. Testé d'abord sur **kind** (Kubernetes dans Docker, sur le poste, 0 €), puis sur **AKS** (Azure Kubernetes Service), créé par Terraform et détruit après la démonstration.
+La même API est déployée sur Kubernetes avec un chart Helm, `k8s/pull-events/`. Testé sur **kind** (Kubernetes dans Docker, sur le poste, 0 €). Le déploiement sur **AKS** (Azure Kubernetes Service) est écrit en Terraform et vérifié par un `terraform plan` à blanc, mais le cluster **n'a jamais été créé** : aucun crédit Azure, règle zéro dépense (voir [AKS](#aks)).
 
 ## Le chart
 

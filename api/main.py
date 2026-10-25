@@ -102,7 +102,7 @@ app = FastAPI(
         "- Génération de réponses via Mistral ou Azure OpenAI\n"
         "- Sources traçables pour chaque réponse"
     ),
-    version="1.2.0",
+    version="1.3.0",
     lifespan=lifespan,
 )
 app.state.limiter = limiter

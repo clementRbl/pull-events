@@ -130,6 +130,12 @@ resource "azurerm_container_app" "api" {
         name  = "LANGFUSE_BASE_URL"
         value = "https://cloud.langfuse.com"
       }
+      # Démo publique : Langfuse ne reçoit que tokens, coûts et latences,
+      # pas le texte des questions ni des réponses (audit 7.3, RGPD).
+      env {
+        name  = "LANGFUSE_TRACE_CONTENT"
+        value = "false"
+      }
       env {
         name  = "LLM_PROVIDER"
         value = "azure_openai"

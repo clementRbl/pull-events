@@ -23,7 +23,7 @@ variable "workstation_ip" {
 variable "api_image" {
   description = "Image de l'API (publique sur GHCR, sans secret)."
   type        = string
-  default     = "ghcr.io/clementrbl/pull-events:0.2.1-azure"
+  default     = "ghcr.io/clementrbl/pull-events:1.3.0"
 }
 
 variable "budget_amount" {
