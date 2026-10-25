@@ -1,10 +1,11 @@
-# Évaluation avant/après : Faiss → pgvector → Azure
+# Évaluation avant/après : Faiss → pgvector → Azure, puis trois découpages
 
 Mesures des 24 et 25 octobre 2026, sur la même base de 39 089 chunks (37 338 événements Open Agenda d'Île-de-France).
 
 - **Faiss → pgvector** (en local) : **les mêmes vecteurs**, copiés tels quels de Faiss vers pgvector (`scripts/faiss_baseline.py export`). Seule la base vectorielle change.
 - **Local → Azure, Mistral (colonne A)** : la table pgvector locale copiée telle quelle (`pg_dump`) sur PostgreSQL Flexible Server. Seule l'infrastructure change.
 - **Azure OpenAI (colonne B)** : LLM `gpt-4.1-mini` et embeddings `text-embedding-3-small`, donc toute la base réindexée. Le modèle et la recherche changent ensemble.
+- **Trois découpages** (en local, 25/10/2026) : seule la façon de couper les événements en chunks change. Section [Trois découpages comparés](#trois-découpages-comparés).
 
 ## Protocole
 
@@ -110,6 +111,76 @@ Langfuse auto-hébergé (web, worker, ClickHouse, PostgreSQL, Redis, MinIO) occu
 - Colonnes Azure : le RAG tourne sur le PC et interroge les ressources Azure. La latence vue par un utilisateur est celle de l'API déployée, mesurée à part en HTTP.
 - La colonne B change le LLM et les embeddings en même temps : une colonne intermédiaire (Ministral avec `text-embedding-3-small`) séparerait les deux effets.
 - Le modèle du RAG a dû passer de `mistral-small-latest` (v1) à `ministral-8b-latest` : la clé API utilisée n'a pas de quota sur les modèles Small et Medium. Les trois colonnes utilisent le même modèle, la comparaison reste valable.
+
+## Trois découpages comparés
+
+Mesures du 25 octobre 2026, en local (PostgreSQL + pgvector dans Docker, `ef_search=100`), sur les mêmes 20 questions et avec le même juge (`claude-haiku-5-5`). LLM : `ministral-8b-latest`, embeddings : `mistral-embed`. Seul le découpage change, et chaque variante a sa propre table.
+
+| Variante (`CHUNKING`) | Ce qu'elle fait |
+|---|---|
+| `ligne` | Le découpage de la v1 : les lignes de l'événement sont regroupées jusqu'à 2 000 caractères. Une ligne plus longue n'est pas coupée, et le HTML nettoyé n'a presque plus de sauts de ligne : une description entière tient souvent sur une seule ligne. |
+| `ligne-plafond` | Même découpe, mais une ligne de plus de 2 000 caractères est d'abord coupée entre deux mots. Aucun chunk ne dépasse 2 000 caractères. |
+| `phrase-recoupement` | L'en-tête de l'événement (titre, dates, lieu) est répété en tête de chaque chunk, suivi de phrases entières jusqu'à 2 000 caractères en tout. Les deux dernières phrases d'un chunk ouvrent le suivant (recoupement). |
+
+Un événement de 2 000 caractères ou moins (35 063 événements sur 37 076) reste un chunk unique, identique avec les trois variantes. Leurs vecteurs ont donc été repris de la table `ligne` au lieu d'être recalculés (`build_index.py --reuse-from event_chunks`) : 7 920 chunks envoyés à `mistral-embed` au lieu de 80 647, pour environ 0,35 $ (estimé à partir des 11,7 millions de caractères envoyés).
+
+Chaque variante a été évaluée **deux fois** : la moyenne des deux passages réduit le bruit du juge, et l'écart entre les deux le mesure.
+
+### Résultats (moyenne de deux passages)
+
+| | `ligne` (v1) | **`ligne-plafond`** (retenu) | `phrase-recoupement` | `ligne-plafond` + Claude Haiku |
+|---|---|---|---|---|
+| Chunks | 39 089 | 40 789 | 39 858 | 40 789 |
+| Longueur médiane / p95 / max (caractères) | 757 / 1 887 / 9 837 | 756 / 1 931 / 2 000 | 778 / 1 881 / 2 000 | idem |
+| Chunks au-delà de 2 000 caractères | 1 414 | 0 | 0 | 0 |
+| **Faithfulness** | 0,892 | 0,885 | 0,911 | 0,928 |
+| **Answer relevancy** | 0,790 | 0,836 | 0,835 | 0,828 |
+| **Context precision** | 0,466 | 0,559 | 0,494 | 0,582 |
+| Écart entre les deux passages, par question (faithfulness / context precision) | 0,056 / 0,166 | 0,052 / 0,108 | 0,036 / 0,152 | 0,044 / 0,146 |
+| Questions dont les 5 sources diffèrent de `ligne` | — | 11 / 20 | 9 / 20 | — |
+| Tokens par question (entrée / sortie) | 1 392 / 345 | **1 177** / 364 | 1 357 / 322 | 1 936 / 818 |
+| Latence totale (moyenne / p95) | 3,15 s / 4,96 s | 3,69 s / 8,94 s | 4,01 s / 12,63 s | 5,12 s / 21,12 s |
+| Recherche vectorielle (moyenne) | 37,9 ms* | 5,6 ms | 4,8 ms | 4,9 ms |
+| Coût LLM pour 1 000 questions | 0,17 $ | 0,15 $ | 0,17 $ | 0,60 $ |
+| Table + index HNSW | 553 Mo | 576 Mo | 568 Mo | 576 Mo |
+
+\* Mesurée pendant que les deux autres tables s'indexaient sur la même base : la recherche était en concurrence avec l'indexation. Comme pour les colonnes précédentes, quelques millisecondes ne pèsent rien devant les 2,7 à 3,7 s de génération, dont la variabilité (API Mistral publique) explique aussi les écarts de latence p95.
+
+Fichiers : `results_chunking_<variante>_run1.json` et `_run2.json`.
+
+### Décision : `ligne-plafond`, sans gagnant net
+
+**Aucune variante ne bat les autres en fidélité au-delà du bruit du juge.** L'écart le plus grand, +0,019 pour `phrase-recoupement`, reste bien sous les ±0,06 mesurés pour une même question d'un passage à l'autre (0,036 à 0,056 ici). La précision du contexte varie de 0,04 à 0,13 entre deux passages *de la même variante* : ses écarts entre variantes (jusqu'à +0,09) ne sont pas interprétables non plus. Seule la pertinence de la réponse progresse de façon cohérente avec les deux nouvelles variantes (+0,045, pour un bruit de 0,022 à 0,034 par question), sans qu'on puisse l'attribuer au recoupement : `ligne-plafond`, qui n'en a pas, fait aussi bien.
+
+La règle fixée avant les mesures était donc de garder la variante la plus simple. **`ligne-plafond` devient le découpage par défaut** : à une coupe entre deux mots près, c'est le code de la v1, avec en plus trois garanties mesurables que la qualité ne départage pas :
+- aucun chunk au-delà de 2 000 caractères (contre 9 837 au plus) : plus aucun risque d'approcher la limite de 8 192 tokens de `mistral-embed` ;
+- 15 % de tokens en moins envoyés au LLM par question (1 177 contre 1 392), donc 11 % de coût en moins ;
+- même qualité que les deux autres variantes, aux erreurs de mesure près.
+
+Le recoupement par phrase n'apporte rien de mesurable sur ce jeu de questions, qui demande surtout des listes d'événements (titre, date, lieu) plutôt qu'un détail enfoui au milieu d'une longue description. Il reste disponible (`CHUNKING=phrase-recoupement`) pour un futur jeu de questions plus précises.
+
+### Claude Haiku comme modèle de réponse
+
+Sur la table `ligne-plafond`, remplacer Ministral 8B par `claude-haiku-5-5` (réflexion minimale, `effort="low"`) donne une fidélité de 0,928 (+0,043) et une précision du contexte de 0,582 (+0,023). Les deux écarts restent sous le bruit du juge, et **le juge est ici le même modèle que celui qui répond** : il note ses propres réponses, ce qui peut les avantager. À lire comme une indication, pas comme une preuve.
+
+Ce qui est sûr, c'est le coût : 0,60 $ pour 1 000 questions, 3,9 fois plus que Ministral. Haiku écrit des réponses plus longues (818 tokens en sortie, réflexion comprise, contre 364), et son tokenizer compte plus de tokens pour le même contexte en français (1 936 contre 1 177). Avec `LLM_MAX_TOKENS=1024`, environ une réponse sur quatre atteint le plafond et se termine au milieu d'une phrase : une comparaison plus juste demanderait un plafond plus haut (2 048) et un juge d'un troisième fournisseur.
+
+### Coût de cette comparaison
+
+| Poste | Coût |
+|---|---|
+| Embeddings `mistral-embed` (7 920 chunks) | ~0,35 $, forfait gratuit Mistral |
+| Réponses Ministral 8B (6 passages de 20 questions) | ~0,02 $, forfait gratuit Mistral |
+| Réponses Claude Haiku (2 passages) | ~0,02 $, crédits Anthropic |
+| Juge Claude Haiku (8 passages) | ~1,0 $ estimé (0,12 $ par passage), crédits Anthropic |
+
+Rien sur Azure : la production (version 1.3.0) garde ses tables actuelles.
+
+### Limites de cette comparaison
+
+- Les mêmes que plus haut : 20 questions aux références génériques, juge instable sur la précision du contexte. Deux passages réduisent le bruit sans le supprimer.
+- Les questions portent sur des listes d'événements, pas sur un détail précis d'une longue description : le cas où le recoupement devrait aider le plus n'est pas représenté.
+- Les sources d'une même configuration changent parfois d'un passage à l'autre (18 / 20 identiques pour la colonne Haiku) : l'embedding de la question renvoyé par l'API Mistral n'est pas parfaitement identique d'un appel à l'autre.
 
 ## Kubernetes
 

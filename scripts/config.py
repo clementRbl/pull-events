@@ -60,8 +60,13 @@ def get_settings() -> Settings:
     """
     vector_table = os.getenv("VECTOR_TABLE", "event_chunks")
     llm_provider = os.getenv("LLM_PROVIDER", "mistral")
-    if llm_provider not in ("mistral", "azure_openai"):
-        msg = f"LLM_PROVIDER doit valoir mistral ou azure_openai : {llm_provider!r}"
+    # anthropic : réservé à l'évaluation (langchain-anthropic est une dépendance
+    # de dev) ; les embeddings restent ceux de Mistral.
+    if llm_provider not in ("mistral", "azure_openai", "anthropic"):
+        msg = (
+            "LLM_PROVIDER doit valoir mistral, azure_openai ou anthropic : "
+            f"{llm_provider!r}"
+        )
         raise ValueError(msg)
     judge_provider = os.getenv("JUDGE_PROVIDER", "anthropic")
     if judge_provider not in ("anthropic", "mistral"):
@@ -94,6 +99,23 @@ def get_settings() -> Settings:
         llm_output_price_per_mtok=_float_env("LLM_OUTPUT_PRICE_PER_MTOK", 0.10),
         embedding_price_per_mtok=_float_env("EMBEDDING_PRICE_PER_MTOK", 0.10),
     )
+
+
+# Stratégies de découpage comparées dans docs/evaluation/README.md
+CHUNKING_STRATEGIES = ("ligne", "ligne-plafond", "phrase-recoupement")
+
+
+def get_chunking() -> str:
+    """Lit la stratégie de découpage des événements (variable CHUNKING).
+
+    Raises:
+        ValueError: Si la stratégie n'est pas connue.
+    """
+    chunking = os.getenv("CHUNKING", "ligne-plafond")
+    if chunking not in CHUNKING_STRATEGIES:
+        msg = f"CHUNKING doit valoir {', '.join(CHUNKING_STRATEGIES)} : {chunking!r}"
+        raise ValueError(msg)
+    return chunking
 
 
 def get_mistral_api_key() -> str:

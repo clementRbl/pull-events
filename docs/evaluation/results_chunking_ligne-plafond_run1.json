@@ -1,0 +1,457 @@
+{
+  "label": "chunking_ligne-plafond_run1",
+  "backend": "pgvector",
+  "llm_provider": "mistral",
+  "llm_model": "ministral-8b-latest",
+  "judge_model": "claude-haiku-5-5",
+  "embedding_model": "mistral-embed",
+  "vector_table": "event_chunks_ligne_plafond",
+  "top_k": 5,
+  "hnsw_ef_search": 100,
+  "summary": {
+    "questions": 20,
+    "quality": {
+      "faithfulness": 0.8885,
+      "answer_relevancy": 0.8479,
+      "llm_context_precision_with_reference": 0.5203
+    },
+    "latency_seconds": {
+      "search_mean": 0.0055,
+      "embedding_mean": 0.29,
+      "generation_mean": 3.124,
+      "total_mean": 3.419,
+      "total_p50": 3.057,
+      "total_p95": 10.685
+    },
+    "tokens_mean": {
+      "input": 1177,
+      "output": 373
+    },
+    "cost_usd": {
+      "per_question_mean": 0.000155,
+      "per_1000_questions": 0.155
+    }
+  },
+  "details": [
+    {
+      "question": "Quels concerts sont prévus à Paris prochainement ?",
+      "answer": "Voici les concerts prévus **à Paris prochainement** selon le contexte fourni :\n\n1. **F&F – Live Acoustic Rock & Pop**\n   - **Date** : Dimanche 21 juin, 19h00\n   - **Lieu** : Place Dalida (Paris, Rue de l'Abreuvoir & Rue Girardon)\n\n2. **Entre classique et musiques actuelles**\n   - **Date** : Dimanche 21 juin, 18h00\n   - **Lieu** : Église Evangélique Libre Paris-Alésia (85 rue d'Alésia, 75014 Paris)\n\n3. **Le Concert impromptu et Sarah Maïer**\n   - **Date** : Samedi 13 juin, 20h00\n   - **Lieu** : Le Pavillon de la Sirène (20 Rue Dareau, 75014 Paris)",
+      "sources": [
+        "F&F – Live Acoustic Rock & Pop",
+        "Entre classique et musiques actuelles",
+        "Concert - \"Dévotions provençales\"",
+        "Le Concert impromptu et Sarah Maïer",
+        "Création : \"une autre histoire de la musique française\" : concert des professeurs musiques actuelles du conservatoire d'Argenteuil"
+      ],
+      "scores": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8757925888322681,
+        "llm_context_precision_with_reference": 0.0
+      },
+      "input_tokens": 889,
+      "output_tokens": 202,
+      "cost_usd": 0.000109,
+      "search_seconds": 0.0088,
+      "total_seconds": 1.725
+    },
+    {
+      "question": "Y a-t-il des expositions à Versailles ?",
+      "answer": "Oui, voici les expositions disponibles à Versailles dans le contexte fourni :\n\n1. **Exposition collective dans le cadre des Parcours dans les ateliers d'artistes**\n   - **Titre** : Parcours dans les ateliers d'artistes de Versailles (exposition collective)\n   - **Lieu** : Hôtel de Ville, 4, avenue de Paris - 78000 Versailles\n   - **Dates** : 29 septembre au 3 octobre 2025 (de 10h à 18h)\n   - **Conditions** : Entrée libre\n\n2. **Exposition \"Versailles vu du ciel II\"**\n   - **Titre** : Versailles vu du ciel II\n   - **Lieu** : Ancienne Poste, 3, avenue de Paris - 78000 Versailles\n   - **Dates** : 6 septembre - 16 novembre 2025\n   - **Conditions** : Tarif : 10 € (incluant l'atelier et la visite de l'exposition)\n\n3. **Exposition \"Versailles Insolite\"**\n   - **Titre** : Versailles Insolite\n   - **Lieu** : Ancienne Poste, 3, avenue de Paris - 78000 Versailles\n   - **Dates** : 9 septembre - 15 novembre 2025\n   - **Conditions** : Plein tarif 7 €, tarif réduit 5 €, gratuité pour certaines catégories.",
+      "sources": [
+        "Parcours dans les ateliers d'artistes de Versailles",
+        "Versailles vu du ciel II : découverte commentée du plan-relief de Versailles",
+        "Visites insolites",
+        "Versailles Insolite",
+        "Versailles vu du ciel II : ateliers simulateur de drone"
+      ],
+      "scores": {
+        "faithfulness": 0.9411764705882353,
+        "answer_relevancy": 0.8763649547832437,
+        "llm_context_precision_with_reference": 0.8874999999778125
+      },
+      "input_tokens": 1070,
+      "output_tokens": 314,
+      "cost_usd": 0.000138,
+      "search_seconds": 0.0104,
+      "total_seconds": 2.146
+    },
+    {
+      "question": "Que faire avec des enfants ce weekend en Île-de-France ?",
+      "answer": "Voici les événements adaptés aux enfants en Île-de-France pour ce week-end (selon les dates disponibles dans le contexte) :\n\n1. **Le coin des tout-petits**\n   - **Dates** : 19 et 20 septembre\n   - **Lieu** : Musée des plans-reliefs, 129 Rue de Grenelle, 75007 Paris\n   - **Description** : Espace en accès libre pour les 0-5 ans, avec jeux, lecture et détente sur des tapis.\n\n2. **Atelier pour enfants « À la manière de Matisse »**\n   - **Dates** : 19 et 20 septembre\n   - **Lieu** : Gros & Delettrez - Rive Gauche, 2 rue de Bérite, 75006 Paris\n   - **Conditions** : Atelier limité à 15 enfants (3-10 ans).\n   - **Description** : Atelier artistique inspiré de Matisse, avec création d'une fresque collective.\n\n*Aucun événement n'est prévu pour ce week-end dans le contexte pour les autres dates mentionnées.*",
+      "sources": [
+        "La grande fête des enfants",
+        "Le coin des tout-petits",
+        "Village des enfants",
+        "Printemps à la ferme",
+        "Atelier pour enfants « À la manière de Matisse »"
+      ],
+      "scores": {
+        "faithfulness": 0.7272727272727273,
+        "answer_relevancy": 0.8848066483321556,
+        "llm_context_precision_with_reference": 0.5833333333041666
+      },
+      "input_tokens": 1415,
+      "output_tokens": 243,
+      "cost_usd": 0.000166,
+      "search_seconds": 0.0067,
+      "total_seconds": 1.943
+    },
+    {
+      "question": "Y a-t-il des spectacles de théâtre à Paris ?",
+      "answer": "Oui, voici les spectacles de théâtre disponibles dans le contexte fourni :\n\n1. **Visites Spectacles** (concept immersif entre théâtre et visite guidée)\n   - **Lieu** : Plusieurs quartiers de Paris (départ depuis **20 passage Saint-Sébastien, Paris**)\n   - **Dates** : Du **28 mars au 27 décembre** (plusieurs créneaux disponibles)\n   - **Description** : Expérience théâtrale en plein air avec des comédiens dans des décors réels (exemples : *L’intrigue des passages couverts*, *Le secret de Notre-Dame*).\n   - **Tarifs** :\n     - Visites-Spectacles : 25€ (adulte), 23€ (tarif réduit), 20€ (-18 ans).\n     - Visites-Enquêtes : 21€ (adulte), 20€ (tarif réduit), 17€ (-18 ans).\n     - Visites Contées : 32€ (adulte), 30€ (tarif réduit), 27€ (-18 ans).\n\n2. **Tant qu'il y aura des coquelicots** (pièce de théâtre contemporaine)\n   - **Titre** : *Tant qu'il y aura des coquelicots*\n   - **Lieu** : Théâtre Le Grenier, **7, rue du Général Leclerc – 78380 Bougival** (hors Paris, mais proche).\n   - **Date** : **Samedi 27 février 2027** (à vérifier pour une éventuelle erreur de date dans le contexte).\n   - **Durée** : 1h15.\n   - **Tarifs** : 19€ (plein tarif), 15€ (tarif réduit), 9,50€ (jeune).\n\n---\n*Aucun autre spectacle de théâtre classique (hors immersif ou théâtralisé) n'est mentionné dans le contexte.*",
+      "sources": [
+        "Visites Spectacles : découvrez Paris comme vous ne l’avez jamais vu",
+        "Tant qu'il y aura des coquelicots",
+        "Visites Spectacles : découvrez Paris comme vous ne l’avez jamais vu",
+        "Visites théâtralisées",
+        "Visites Spectacles : découvrez Paris comme vous ne l’avez jamais vu"
+      ],
+      "scores": {
+        "faithfulness": 0.7777777777777778,
+        "answer_relevancy": 0.846645281176505,
+        "llm_context_precision_with_reference": 0.0
+      },
+      "input_tokens": 1218,
+      "output_tokens": 422,
+      "cost_usd": 0.000164,
+      "search_seconds": 0.0067,
+      "total_seconds": 2.866
+    },
+    {
+      "question": "Quels événements gratuits sont disponibles en Île-de-France ?",
+      "answer": "Voici les événements **gratuits** disponibles en Île-de-France selon le contexte fourni :\n\n### **Événements estivaux (juillet-août) :**\n1. **Biennale Urbaine de Spectacles**\n   - **Lieu** : Place François de Larderel, Bobigny\n   - **Dates** :\n     - Performances artistiques (Street Football Academy, Grosse Plateforme) : **4 et 5 juillet**\n   - **Activités** : Spectacles vivants, street art, initiation au graffiti (11 et 12 juillet à Aubervilliers).\n\n2. **Fête des berges et street art**\n   - **Lieu** : Aubervilliers (Street Art Avenue)\n   - **Dates** : **11 et 12 juillet** (initiation au graffiti et scratching).\n   - **Autres lieux** : Bords des canaux (guinguettes, bals, péniches *Chat qui pêche* et *Barboteur*) : **18 et 19 juillet**.\n\n3. **Week-end cinéma et patrimoine**\n   - **Lieu** : Parc de la Villette (cinéma en plein air), Saint-Ouen-sur-Seine (archives Gaumont-Pathé), Cité du Cinéma.\n   - **Dates** : **25 et 26 juillet**.\n   - **Thème** : Cinéma en plein air (*L’appel de la forêt*), croisières cinéma, visites exceptionnelles.\n\n4. **Grande Marche Héritage Olympique**\n   - **Lieu** : Départs depuis la Grande Halle de la Villette, Bobigny (PRISME), Épinay-sur-Seine, Porte de la Chapelle.\n   - **Dates** : **1er août** (et nouveauté 2026 : **2 août** avec 5 parcours de 12–14 km).\n   - **Activités** : Randonnées culturelles gratuites pour découvrir les sites des JO 2024 (Village des athlètes, Stade de France, etc.).\n\n---\n\n### **Événements automnaux (octobre) :**\n5. **Invitation à goûter à la richesse du vivant... autrement !**\n   - **Lieu** : Cité des sciences et de l'Industrie, 30 avenue Corentin Cariou, Paris 19ᵉ.\n   - **Dates** : **3 et 4 octobre**.\n   - **Organisateur** : Insectarium de Lizio.\n   - **Mots-clés** : Fête, science (gratuit).\n\n6. **S’éveiller à la beauté du vivant**\n   - **Lieu** : Cité des sciences et de l'Industrie, Paris 19ᵉ.\n   - **Dates** : **3 et 4 octobre**.\n   - **Organisateur** : Paysan des couleurs.\n   - **Mots-clés** : Fête, science, jeux en extérieur (gratuit).\n\n---\n### **Événements sans détails précis (à vérifier sur les liens) :**\n- **Louvres (95)** : Entrée gratuite (lien Facebook : [lien](https://fb.me/e/aWMyTQSbC)).\n- **Autre événement** : [Lien Facebook](https://fb.me/e/4qkFx21Nt) (pas d’infos exploitables ici).\n\n---\n**Remarque** :\nLes événements du **3 et 4 octobre** à la Cité des sciences sont **identiques en description** mais organisés par deux acteurs différents (Insectarium de Lizio et Paysan des couleurs). Il est possible qu’il s’agisse d’ateliers ou d’animations distinctes au sein d’une même fête.",
+      "sources": [
+        "L'été du Canal 2026",
+        "Invitation à goûter à la richesse du vivant… autrement !",
+        "Fête de la Musique",
+        "8 ans de la brasserie !",
+        "S’éveiller à la beauté du vivant"
+      ],
+      "scores": {
+        "faithfulness": 0.7073170731707317,
+        "answer_relevancy": 0.8712908655414627,
+        "llm_context_precision_with_reference": 0.9999999999
+      },
+      "input_tokens": 956,
+      "output_tokens": 795,
+      "cost_usd": 0.000175,
+      "search_seconds": 0.0055,
+      "total_seconds": 5.53
+    },
+    {
+      "question": "Quels festivals de musique ont lieu en Île-de-France ?",
+      "answer": "Voici les festivals de musique en Île-de-France mentionnés dans le contexte :\n\n1. **XIXème Festival d'Orgue à Champcueil**\n   - **Dates** : 19 et 20 septembre 2026\n   - **Lieu** : Église Notre-Dame-de-l'Assomption, 6 rue de la Procession, 91750 Champcueil\n   - **Description** : Festival centré sur l'orgue avec des concerts et une conférence sur l'art campanaire.\n\n2. **MAISONS LAFFITTE JAZZ FESTIVAL**\n   - **Dates** : 19 au 28 juin 2026\n   - **Lieu** : Château de Maisons-Laffitte, 2 Avenue Carnot, 78600 Maisons-Laffitte\n   - **Description** : Festival de jazz reconnu pour sa programmation de qualité.\n\n3. **Festival Échos Vivants**\n   - **Dates** : 11 avril 2026\n   - **Lieu** : Le Point Fort d'Aubervilliers, 174 Avenue Jean Jaurès, 93300 Aubervilliers\n   - **Description** : Festival célébrant la multiculturalité et le patrimoine culturel immatériel (PCI) avec des ateliers et performances variées.\n\n4. **Festival des Cultures**\n   - **Dates** : 26 et 27 juin 2026\n   - **Lieu** : Brasserie Parisis, 3 Rue René Dumont, 77380 Combs-la-Ville\n   - **Description** : Festival avec des concerts incluant des styles comme le mandingue, maloya, afro-rock et grunge.\n\n*(Note : \"La musique est en fête !\" est une célébration annuelle, mais pas un festival structuré avec des dates spécifiques autres que le 21 juin.)*",
+      "sources": [
+        "XIXème Festival d'Orgue à Champcueil",
+        "MAISONS LAFFITTE JAZZ FESTIVAL",
+        "Festival Echos vivants",
+        "La musique est en fête !",
+        "FESTIVAL DES CULTURES"
+      ],
+      "scores": {
+        "faithfulness": 0.875,
+        "answer_relevancy": 0.936979888531838,
+        "llm_context_precision_with_reference": 0.4777777777618519
+      },
+      "input_tokens": 1857,
+      "output_tokens": 415,
+      "cost_usd": 0.000227,
+      "search_seconds": 0.0055,
+      "total_seconds": 3.331
+    },
+    {
+      "question": "Y a-t-il des ateliers d'écriture ou de lecture en bibliothèque ?",
+      "answer": "Oui, voici les ateliers d'écriture ou de lecture organisés en bibliothèque selon le contexte :\n\n1. **Atelier d'écriture créative FLE spécial francophonie**\n   - **Titre** : Atelier d'écriture créative FLE spécial francophonie\n   - **Lieu** : Bibliothèque nationale de France, Quai François Mauriac, 75706 Paris Cedex 13\n   - **Date** : Lundi 16 mars, 18h00\n   - **Description** : Atelier d'écriture créative en français langue étrangère centré sur la francophonie et le livret « Dis-moi dix mots ».\n\n2. **Atelier d'écriture • Sauve qui peut les mots**\n   - **Titre** : Atelier d'écriture • Sauve qui peut les mots\n   - **Lieu** : Bibliothèque publique d'information (Bpi), 40 avenue des Terroirs de France, Paris\n   - **Dates** :\n     - Vendredi 20 février, 18h00\n     - Vendredi 20 mars, 18h00 (gratuit sur inscription)\n\n3. **Atelier d'écriture (autobiographie)**\n   - **Titre** : Atelier d'écriture « Rédigez votre autobiographie »\n   - **Lieu** : Bibliothèque publique ado/adulte, Maison du temps libre, 78 rue de Meaux, 93410 Vaujours\n   - **Date** : Samedi 3 octobre, 10h00\n\nPour les ateliers du **20 février** et du **20 mars** à la Bpi, une inscription est nécessaire. Pour celui du **16 mars** à la BNF, l'inscription se fait sur place à partir de 17h45.",
+      "sources": [
+        "Atelier d'écriture créative FLE spécial francophonie",
+        "Atelier d'écriture",
+        "Réunion publique : Quel avenir pour la Maison Raspail ? Les étapes pour créer un lieu culturel et convivial ancré dans l’histoire et son patrimoine",
+        "Atelier d'écriture • Sauve qui peut les mots",
+        "Atelier d'écriture • Sauve qui peut les mots"
+      ],
+      "scores": {
+        "faithfulness": 0.8571428571428571,
+        "answer_relevancy": 0.8942957195413642,
+        "llm_context_precision_with_reference": 0.99999999998
+      },
+      "input_tokens": 1071,
+      "output_tokens": 386,
+      "cost_usd": 0.000146,
+      "search_seconds": 0.0051,
+      "total_seconds": 4.867
+    },
+    {
+      "question": "Quelles visites guidées sont proposées à Paris ?",
+      "answer": "Voici les visites guidées proposées à Paris dans le contexte fourni :\n\n1. **Visite guidée découverte en LSF**\n   - **Lieu** : Musée des plans-reliefs, 129 Rue de Grenelle, 75007 Paris\n   - **Date** : Samedi 19 septembre à 10h30\n   - **Description** : Découverte de la collection des plans-reliefs en langue des signes française (LSF).\n\n2. **Visite guidée : Les incontournables du musée**\n   - **Lieu** : Musée Carnavalet - histoire de Paris, 23 Rue de Sévigné, 75003 Paris\n   - **Dates** : Samedi 19 septembre à 10h00 et 14h30\n   - **Description** : Visite guidée de l’histoire de Paris à travers des œuvres emblématiques.\n\n3. **Visites guidées des réserves du Pôle archéologique de Paris**\n   - **Lieu** : Pôle archéologique de Paris, 11 Rue du Pré, 75018 Paris\n   - **Date** : Vendredi 12 juin à 10h00 (événement passé, mais mentionné dans le contexte)\n   - **Description** : Découverte des réserves archéologiques (réservation obligatoire).\n\n4. **Visite guidée de l'église Saint-François-Xavier**\n   - **Lieu** : Église Saint-François-Xavier, Place du Président Mithouard, 75007 Paris\n   - **Dates** : Dimanche 20 septembre à 15h30 et 17h00\n   - **Description** : Découverte du patrimoine de l’église (orgues, sculptures, peintures, vitraux).\n\n5. **Visite guidée : Les salons du gouverneur militaire de Paris**\n   - **Lieu** : Hôtel des Invalides - Musée de l'armée, 129 Rue de Grenelle, 75007 Paris\n   - **Dates** : Samedi 19 et dimanche 20 septembre (plusieurs créneaux disponibles)\n   - **Description** : Visite des espaces privés du gouverneur militaire (réservation sur place possible).",
+      "sources": [
+        "Visite guidée découverte en LSF",
+        "Visite guidée : Les incontournables du musée",
+        "Visites guidées des réserves du Pôle archéologique de Paris",
+        "Visite guidée de l'église",
+        "Visite guidée\nLes salons du gouverneur militaire de Paris"
+      ],
+      "scores": {
+        "faithfulness": 0.9473684210526315,
+        "answer_relevancy": 0.8335231101692009,
+        "llm_context_precision_with_reference": 0.8666666666377778
+      },
+      "input_tokens": 1391,
+      "output_tokens": 486,
+      "cost_usd": 0.000188,
+      "search_seconds": 0.0045,
+      "total_seconds": 3.248
+    },
+    {
+      "question": "Y a-t-il des spectacles de danse en Seine-Saint-Denis ?",
+      "answer": "Oui, voici les spectacles ou ateliers de danse en Seine-Saint-Denis mentionnés dans le contexte :\n\n1. **Atelier de danse** :\n   - **Titre** : Atelier de danse de la Compagnie DCA / Philippe Decouflé\n   - **Lieu** : La Chaufferie, 10 bis rue Maurice-Thorez, 93200 Saint-Denis\n   - **Dates** : Dimanche 20 septembre, de 14h à 17h\n   - **Description** : Atelier participatif de danses de salon (tango, rock, valse, etc.) animé par des danseurs de la compagnie.\n\n2. **Projection et visites liées à la danse** :\n   - **Lieu** : Même adresse que l'atelier (La Chaufferie)\n   - **Dates** : Projections de 17h à 18h, visites guidées en continu de 14h à 17h.\n\n*Aucun spectacle de danse purement scénique n'est mentionné dans le contexte.*",
+      "sources": [
+        "Et en plus ils dansent!",
+        "BRUMES - version hors les murs",
+        "Atelier de danse de la Compagnie DCA / Philippe Decouflé",
+        "Brumes - Version hors les murs",
+        "Brumes - Version hors les murs"
+      ],
+      "scores": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9198577547883287,
+        "llm_context_precision_with_reference": 0.0
+      },
+      "input_tokens": 778,
+      "output_tokens": 227,
+      "cost_usd": 0.000101,
+      "search_seconds": 0.0052,
+      "total_seconds": 2.375
+    },
+    {
+      "question": "Quels événements sont organisés pour les Journées européennes du patrimoine ?",
+      "answer": "Voici les événements organisés pour les **Journées européennes du patrimoine** en Île-de-France selon le contexte fourni :\n\n1. **Journées européennes du patrimoine à la Cour des comptes**\n   - **Dates** : 19 et 20 septembre\n   - **Lieu** : Palais Cambon - Cour des comptes, 13 rue Cambon, 75001 Paris\n   - **Description** : Découverte de l’histoire, du patrimoine architectural et des œuvres des patients. Visites guidées, expositions (dont *\"1934, d’un asile à l’autre, vies de papier\"*), spectacles (théâtre, récital de piano) et visite libre pour les jeunes publics.\n\n2. **Journées européennes du patrimoine à l'Hôtel de Matignon**\n   - **Dates** : 19 et 20 septembre\n   - **Lieu** : Hôtel de Matignon, 57 Rue de Varenne, 75007 Paris\n   - **Description** : Découverte des savoir-faire (passementerie, apiculture), exposition photographique, sensibilisation au sauvetage des œuvres culturelles, et animations autour des métiers du Secrétariat général du Gouvernement.\n\n3. **Les Journées européennes du patrimoine au 19M**\n   - **Dates** : 19 et 20 septembre\n   - **Lieu** : Le 19M, 2 place Skanderberg, 75019 Paris\n   - **Description** : Ouverture exceptionnelle pour découvrir les Maisons d’art *Atelier Montex* et *Studio MTX* et rencontrer les artisans des Métiers d’art.\n\n---\n*Note* : Les deux descriptions identiques (Événements 2 et 5) correspondent au même événement : **Journées européennes du patrimoine à l’établissement psychiatrique de Ville-Évrard** (non nommé explicitement dans le contexte, mais détaillé). Pour plus de clarté, je l’ai intégré sous le titre générique de l’événement.",
+      "sources": [
+        "Journées européennes du patrimoine à la Cour des comptes",
+        "Visite guidée de l'hôpital",
+        "Journées européennes du patrimoine à l'Hôtel de Matignon",
+        "Les Journées européennes du patrimoine au 19M",
+        "Visite du musée de la Serhep (Société d’études et de recherches historiques en psychiatrie)"
+      ],
+      "scores": {
+        "faithfulness": 0.7727272727272727,
+        "answer_relevancy": 0.8577963524824908,
+        "llm_context_precision_with_reference": 0.5333333333155555
+      },
+      "input_tokens": 1720,
+      "output_tokens": 438,
+      "cost_usd": 0.000216,
+      "search_seconds": 0.0042,
+      "total_seconds": 10.956
+    },
+    {
+      "question": "Où voir une projection de cinéma en plein air ?",
+      "answer": "Voici les événements de **cinéma en plein air** disponibles dans le contexte :\n\n1. **\"Cinéma en plein air - Parvis de Corentin Celton\"**\n   - **Lieu** : Place Paul Vaillant Couturier, Issy-les-Moulineaux\n   - **Date** : Vendredi 4 septembre à 18h00\n   - **Film** : *Rasta Rockett* (projection à la nuit tombée)\n\n2. **\"Cinéma en plein air au Fort - Esplanade du Belvédère\"**\n   - **Lieu** : Esplanade du Belvédère, Issy-les-Moulineaux\n   - **Date** : Samedi 4 juillet à 18h00 *(déjà passé, mais mentionné pour référence)*\n   - **Film** : *Dragons* (projection à 22h30)\n\n3. **\"Cinéma en plein air - Place Chabanne\"**\n   - **Lieu** : Place Chabanne, Issy-les-Moulineaux\n   - **Date** : Samedi 5 septembre à 18h00\n   - **Film** : *Flow* (projection à la nuit tombée)\n\n---\n*Note* : L'événement du **5 juillet** est passé. Pour une projection **proche de la date actuelle**, privilégiez les événements du **4 et 5 septembre** à Issy-les-Moulineaux.",
+      "sources": [
+        "Cinéma en plein air - Parvis de Corentin Celton",
+        "Cinéma en plein air au Fort - Esplanade du Belvédère",
+        "Cinéma en plein air : Sous Hypnose",
+        "Projection « L'art dans l'espace public de Grand Paris Sud »",
+        "Cinéma en plein air - Place Chabanne"
+      ],
+      "scores": {
+        "faithfulness": 0.7647058823529411,
+        "answer_relevancy": 0.8066318656583112,
+        "llm_context_precision_with_reference": 0.94999999997625
+      },
+      "input_tokens": 1207,
+      "output_tokens": 307,
+      "cost_usd": 0.000151,
+      "search_seconds": 0.0048,
+      "total_seconds": 2.859
+    },
+    {
+      "question": "Quelles conférences sur les sciences sont prévues ?",
+      "answer": "Voici les conférences sur les sciences prévues dans les événements fournis :\n\n1. **Les conférences** (générales)\n   - **Dates** : 17 février 2022 – 27 janvier 2026\n   - **Lieu** : Cité des sciences et de l'Industrie (Paris 19e)\n   - **Description** : Conférences données par des chercheurs sur des sujets variés en science et société.\n\n2. **Les conférences de septembre 2025 à janvier 2026**\n   - **Dates** : 23 septembre 2025 – 27 janvier 2026\n   - **Lieu** : Cité des sciences et de l'Industrie (Paris 19e)\n   - **Thèmes** : Impacts de l’usage de l’azote, jardins et pratiques sociales, \"Ma première conférence\" pour enfants.\n\n3. **Les conférences de février à juin 2026**\n   - **Date précise** : Lundi 18 mai 2026 à 16h00\n   - **Lieu** : Cité des sciences et de l'Industrie (Paris 19e)\n   - **Thèmes** : Voyage dans les 40 ans de découvertes, conférences immersives, \"Les insolites\" (questions scientifiques inattendues), rencontres avec des scientifiques (dont Michel Mayor et Didier Queloz).\n\n4. **Les conférences insolites**\n   - **Dates** : 28 octobre 2026 – 31 mars 2027 (certains mercredis)\n   - **Lieu** : Grand Palais - Palais de la Découverte (Paris 8e)\n   - **Description** : Conférences répondant à des questions scientifiques décalées ou inattendues.\n\n5. **Conférences - Cap sur l'espace !**\n   - **Dates** : 12 et 13 septembre (sans année précise, mais probablement en 2024 ou 2025 selon le contexte)\n   - **Lieu** : Cité des sciences et de l'Industrie (Paris 19e)\n   - **Intervenants** : Astronautes Claudie Haigneré, Thomas Pesquet et Arnaud Prost.\n\n---\n*Note* : Aucune conférence n'est prévue explicitement pour les années **2023** ou **2024** dans le contexte donné.",
+      "sources": [
+        "Les conférences",
+        "Les conférences insolites",
+        "Les conférences de février à juin 2026",
+        "Les conférences de septembre 2025 à janvier 2026",
+        "Conférences - Cap sur l'espace !"
+      ],
+      "scores": {
+        "faithfulness": 0.9166666666666666,
+        "answer_relevancy": 0.9134406094931083,
+        "llm_context_precision_with_reference": 0.499999999975
+      },
+      "input_tokens": 1176,
+      "output_tokens": 518,
+      "cost_usd": 0.000169,
+      "search_seconds": 0.0045,
+      "total_seconds": 3.772
+    },
+    {
+      "question": "Y a-t-il des expositions de photographie à Paris ?",
+      "answer": "Oui, voici les expositions de photographie à Paris disponibles dans le contexte fourni :\n\n1. **\"Des photographies aux archives : pour quoi faire ?\"**\n   - **Dates** : 17 septembre 2026 – 23 décembre 2026\n   - **Lieu** : Archives de Paris, 18 boulevard Sérurier, 75019 Paris\n   - **Description** : Exposition sur les usages des photographies (XIXᵉ-XXIᵉ siècles) conservées aux Archives de Paris.\n\n2. **\"La photographie au musée d’Orsay : un parcours inédit dans les collections\"**\n   - **Dates** : 14 septembre 2027 – 26 décembre 2027\n   - **Lieu** : Musée d'Orsay, 1 Rue de la Légion d'Honneur, 75007 Paris\n   - **Description** : Parcours permanent intégrant des photographies des collections du musée, avec une réflexion sur l'histoire et les débats autour de la photographie.\n\n3. **\"Pixels et poétique\"** *(à vérifier pour la photographie, mais mentionnée comme exposition d'art contemporain)*\n   - **Dates** : 26 mars – 14 mai *(sans année précise dans le contexte)*\n   - **Lieu** : Centre tchèque de Paris, 18 Rue Bonaparte, 75006 Paris\n   - **Conditions** : Entrée libre\n\n*Note* : L'événement 4 mentionne \"art contemporain\" sans préciser explicitement la photographie comme thème principal. Pour une confirmation, il faudrait vérifier les détails de l'exposition.",
+      "sources": [
+        "Exposition \"Des photographies aux Archives : pour quoi faire ?\"",
+        "Des photographies aux archives : pour quoi faire ?",
+        "La photographie au musée d’Orsay : un parcours inédit dans les collections",
+        "Exposition Pixels et poétique",
+        "Exposition de Jean-Gabriel Lopez, En attendant Batut - galerie Sit Down"
+      ],
+      "scores": {
+        "faithfulness": 0.7894736842105263,
+        "answer_relevancy": 0.9243109481818655,
+        "llm_context_precision_with_reference": 0.6791666666496875
+      },
+      "input_tokens": 945,
+      "output_tokens": 348,
+      "cost_usd": 0.000129,
+      "search_seconds": 0.005,
+      "total_seconds": 3.395
+    },
+    {
+      "question": "Quelles activités sont proposées pour les seniors ?",
+      "answer": "D'après le contexte fourni, voici les activités spécifiquement proposées pour les seniors en Île-de-France :\n\n1. **Atelier \"Dynamiques et perspectives\"**\n   - **Titre** : Atelier seniors : dynamiques et perspectives\n   - **Lieu** : Agence Nemours, 77140 Nemours\n   - **Date** : Mercredi 10 juin, 14h00\n   - **Description** : Exploration des stéréotypes liés à l'âge, échange de groupe pour renforcer la dynamique et la confiance.\n\n2. **Ateliers \"360° : échangeons sur vos compétences et expériences\"**\n   - **Lieu** : Agence Avon, 77210 Avon\n   - **Dates** :\n     - Mercredi 14 octobre, 09h15\n     - Jeudi 20 août, 13h00\n     - Jeudi 22 octobre, 14h00\n   - **Description** : Échanges conviviaux pour valoriser vos parcours, compétences et expériences.\n\n3. **Sport et vélo pour seniors**\n   - **Titre** : Sport Senior et Vélo\n   - **Lieu** : Vélodrome, 51 avenue de Gravelle, Charenton-le-Pont\n   - **Dates** : Du 3 avril au 10 juillet, les vendredis matin\n   - **Activités** : Remise en selle, remise en forme, maîtrise, sécurité, mécanique et balades.",
+      "sources": [
+        "Atelier seniors : dynamiques et perspectives",
+        "Sport Senior et Vélo",
+        "atelier 360 /les seniors échangeons sur vos compétences et expériences",
+        "atelier 360 /les seniors échangeons sur vos compétences et expériences",
+        "atelier 360 /les seniors échangeons sur vos compétences et expériences"
+      ],
+      "scores": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9456367877865254,
+        "llm_context_precision_with_reference": 0.0
+      },
+      "input_tokens": 971,
+      "output_tokens": 328,
+      "cost_usd": 0.00013,
+      "search_seconds": 0.0043,
+      "total_seconds": 2.82
+    },
+    {
+      "question": "Y a-t-il des concerts de musique classique dans les Yvelines ?",
+      "answer": "Oui, voici les concerts de musique classique dans les Yvelines selon le contexte fourni :\n\n1. **Concert musique française piano violoncelle**\n   - **Date** : Dimanche 20 septembre, 17h00\n   - **Lieu** : Les Maisonnettes de Lili et Nadia Boulange, 2 place Lili Boulanger, 78440 Gargenville\n   - **Conditions** : 18€, gratuit pour les enfants.\n\n2. **Concert classique pour les familles**\n   - **Date** : Samedi 4 avril, 20h30\n   - **Lieu** : La Merise, Place des Merisiers, 78190 Trappes\n\n3. **Concert à Versailles : Les rencontres Musicâme**\n   - **Date** : Dimanche 1 février, 15h00\n   - **Lieu** : Cathédrale Saint-Louis, 4 place Saint-Louis, 78000 Versailles\n   - **Conditions** : 30€ (prestige) ou 25€ (essentiel).\n\n4. **Gala Symphonique**\n   - **Date** : Dimanche 28 juin, 18h30\n   - **Lieu** : Théâtre Alexandre Dumas, 3 Rue Henri IV, 78100 Saint-Germain-en-Laye.",
+      "sources": [
+        "Elle court , elle court la musique",
+        "Concert musique française piano violoncelle",
+        "Concert classique pour les familles",
+        "Concert à Versailles : Les rencontres Musicâme",
+        "Gala Symphonique"
+      ],
+      "scores": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9458442440048067,
+        "llm_context_precision_with_reference": 0.6791666666496875
+      },
+      "input_tokens": 1325,
+      "output_tokens": 302,
+      "cost_usd": 0.000163,
+      "search_seconds": 0.0053,
+      "total_seconds": 2.223
+    },
+    {
+      "question": "Quels spectacles de marionnettes ou de contes pour enfants sont programmés ?",
+      "answer": "Voici les spectacles de marionnettes ou de contes pour enfants programmés dans le contexte fourni :\n\n1. **Spectacle de marionnettes pour enfants**\n   - **Titre** : *Sept Lieux : Guignol*\n   - **Dates** : Dimanche 11 janvier à 11h00 et dimanche 25 janvier à 11h00\n   - **Lieu** : Sept Lieux, 3 avenue de Paris, 78000 Versailles\n   - **Conditions** : Entrée libre\n   - **Public** : Enfants de 2 à 12 ans\n\n2. **Spectacle de marionnettes et visite théâtralisée (conte historique)**\n   - **Titre** : *Le château raconté par les marionnettes*\n   - **Date** : Samedi 19 septembre à 11h30\n   - **Lieu** : Domaine de Grosbois, 46 avenue de Grosbois, 94440 Marolles-en-Brie\n   - **Conditions** : 10€/personne, sur réservation uniquement\n   - **Public** : Enfants de 3 à 7 ans\n\n3. **Spectacle de contes (sans marionnettes mais adapté aux enfants)**\n   - **Titre** : *Histoires ? Raconte ! Histoires tunisiennes qui donnent le sourire*\n   - **Date** : Mercredi 6 mai à 14h00\n   - **Lieu** : Théâtre Mandapa, 6 rue Wurtz, Paris\n   - **Conditions** : Tarif unique de 10€\n   - **Public** : Jeune public et famille\n\n4. **Spectacle de contes revisités (sans marionnettes mais adapté à tous publics)**\n   - **Titre** : *Filles & Soie pour toutes & tous*\n   - **Dates** : 11-13 décembre 2025\n   - **Lieu** : International Visual Theatre, 7 Cité Chaptal\n   - **Public** : Accessible à tous (contes revisités, humour et théâtre d'objet)",
+      "sources": [
+        "Sept Lieux : Guignol - spectacle pour enfants",
+        "Sept Lieux : Guignol - spectacle pour enfants",
+        "Le château raconté par les marionnettes",
+        "Filles & Soie pour toutes & tous",
+        "Histoires ? Raconte ! Histoires tunisiennes qui donnent le sourire"
+      ],
+      "scores": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9199105483736573,
+        "llm_context_precision_with_reference": 0.99999999995
+      },
+      "input_tokens": 1225,
+      "output_tokens": 472,
+      "cost_usd": 0.00017,
+      "search_seconds": 0.0047,
+      "total_seconds": 3.669
+    },
+    {
+      "question": "Y a-t-il des événements autour du jardinage ou de la nature ?",
+      "answer": "Oui, voici les événements autour du **jardinage** ou de la **nature** disponibles dans le contexte :\n\n1. **Jardiner en milieu urbain**\n   - **Dates** : 4 et 5 juillet\n   - **Lieu** : Jardibel, Allée Jacques Canetti, 92150 Suresnes\n   - **Description** : Découverte du jardinage en milieu urbain (gratuit).\n\n2. **Atelier photographie de jardins**\n   - **Date** : Dimanche 7 juin, 15h30\n   - **Lieu** : Maison de l’Environnement, RD346, 77240 Vert-Saint-Denis\n   - **Description** : Atelier pour explorer la photographie en pleine nature (jardins).\n\n3. **Découvertes et ateliers autour du végétal**\n   - **Dates** : 6 et 7 juin (14h–17h30)\n   - **Lieu** : Château de Maisons, 2 avenue Carnot, 78600 Maisons-Laffitte\n   - **Activités** :\n     - Animations ludiques et sensorielles pour enfants (biodiversité, reconnaissance de graines, etc.).\n     - Quiz botanique et balade guidée (dimanche 7 juin à 14h30, réservation obligatoire).\n\n---\n*Note* : Les événements **4** et **5** mentionnés dans le contexte ne sont pas détaillés (manque d’informations). Seuls les 3 premiers événements ci-dessus sont confirmés.",
+      "sources": [
+        "Jardiner en milieu urbain",
+        "Atelier photographie de jardins",
+        "Découvertes et ateliers autour du végétal",
+        "Atelier cyanotype",
+        "Rendez-vous aux jardins du musée Bourdelle : Visites des jardins et ateliers créatifs"
+      ],
+      "scores": {
+        "faithfulness": 0.8235294117647058,
+        "answer_relevancy": 0.9380525189879959,
+        "llm_context_precision_with_reference": 0.3333333333
+      },
+      "input_tokens": 748,
+      "output_tokens": 341,
+      "cost_usd": 0.000109,
+      "search_seconds": 0.0041,
+      "total_seconds": 2.513
+    },
+    {
+      "question": "Quels événements ont lieu dans le Val-de-Marne ?",
+      "answer": "Voici les événements **uniquement dans le Val-de-Marne** selon le contexte fourni :\n\n1. **À la rencontre des pros de l'archéologie**\n   - **Date** : Dimanche 20 septembre, 10h00\n   - **Lieu** : Service archéologie du Département du Val-de-Marne, 3 rue Guy-Môquet, 94800 Villejuif\n\n2. **Visite guidée de la Préfecture du Val-de-Marne**\n   - **Date** : Samedi 19 septembre, 14h00\n   - **Lieu** : Préfecture Hôtel du Département, 21-29 avenue du Général-de-Gaulle, 94000 Créteil\n\n3. **Visite de l'Usine de Valorisation Énergétique de Valo'Marne**\n   - **Date** : Mercredi 18 novembre, 10h00\n   - **Lieu** : Suez – Créteil, 10 rue des Malfourches, 94000 Créteil\n\n4. **Atelier création d'entreprise : 3 2 1 créez ! avec la CCI 94**\n   - **Date** : Mardi 9 juin, 09h30\n   - **Lieu** : Créteil - Agence L'Hay-les-Roses, 94000 Créteil\n\n*(L'événement du **Château de Champs-sur-Marne** se situe en Seine-et-Marne, donc hors du Val-de-Marne.)*",
+      "sources": [
+        "A la rencontre des pros de l'archéologie",
+        "Visite de l'Usine de Valorisation Energétique de Valo'Marne",
+        "Visite guidée de la Préfecture du Val-de-Marne",
+        "Visite Famille : Laissez-vous conter...",
+        "Atelier création d'entreprise : 3 2 1 créez ! avec la CCI 94"
+      ],
+      "scores": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.8905460137329211,
+        "llm_context_precision_with_reference": 0.0
+      },
+      "input_tokens": 1138,
+      "output_tokens": 335,
+      "cost_usd": 0.000147,
+      "search_seconds": 0.0046,
+      "total_seconds": 3.559
+    },
+    {
+      "question": "Y a-t-il des ateliers numériques ou d'initiation à l'informatique ?",
+      "answer": "Oui, voici les ateliers numériques ou d'initiation à l'informatique disponibles dans le contexte :\n\n1. **Découvrir les outils numériques**\n   - **Dates** : 3 février - 16 juin, certains mardis\n   - **Lieu** : Cité des sciences et de l'Industrie, 30 avenue Corentin Cariou, 75019 Paris\n   - **Description** : Ateliers gratuits pour découvrir et utiliser des outils numériques (bureautique, collaboratifs, géolocalisation, etc.).\n\n2. **Découvrir l'ordinateur**\n   - **Dates** : Lundi 13 avril, 09h30\n   - **Lieu** : Agence Dammarie-les-Lys, 77190 Dammarie-les-Lys\n   - **Description** : Atelier de prise en main pour débutants, incluant découverte de l'ordinateur, du bureau, d'Internet et du stockage.\n\n3. **Initiation à la programmation**\n   - **Dates** : Du 30 novembre 2022 au 22 novembre 2026 (disponible toute l'année)\n   - **Lieu** : Les Étincelles du Palais de la découverte, 186 Rue Saint-Charles, 75015 Paris\n   - **Description** : Atelier pour découvrir la programmation (notamment en Python) et le fonctionnement des ordinateurs.\n\n4. **Découvrez les ateliers d'inclusions numériques avec Konexio !**\n   - **Dates** : Mercredi 30 septembre, 10h00\n   - **Lieu** : Agence Paris 20ème Vitruve, 75020 Paris\n   - **Description** : Ateliers courts pour débutants, axés sur les bases numériques et l'IA.\n\n5. **Atelier vidéo par IA** *(hors informatique classique, mais lié aux outils numériques)*\n   - **Dates** : Non précisées (hors contexte actuel)\n   - **Lieu** : 157 boulevard Macdonald, 75019 Paris\n   - **Description** : Atelier pratique gratuit sur la création de contenu vidéo avec l'IA (pour professionnels ou entrepreneurs).\n\n---\n*Note* : Les événements **3** et **4** sont particulièrement adaptés à une initiation complète (programmation et bases numériques). Les autres proposent des approches thématiques ou pratiques.",
+      "sources": [
+        "Découvrir les outils numériques",
+        "Decouvrir l'ordinateur",
+        "Initiation à la programmation",
+        "Découvrez les ateliers d'inclusions numériques avec Konexio !",
+        "Créez votre double IA : Vos vidéos professionnelles sans matériel"
+      ],
+      "scores": {
+        "faithfulness": 0.8695652173913043,
+        "answer_relevancy": 0.8756417168288305,
+        "llm_context_precision_with_reference": 0.9166666666361111
+      },
+      "input_tokens": 1413,
+      "output_tokens": 542,
+      "cost_usd": 0.000196,
+      "search_seconds": 0.0047,
+      "total_seconds": 3.855
+    },
+    {
+      "question": "Quel temps fera-t-il demain à Paris ?",
+      "answer": "Je ne peux pas répondre à votre question, car le contexte ne contient aucune information concernant la météo ou les prévisions pour demain à Paris.",
+      "sources": [
+        "L'amour est-il écrit dans les étoiles ?",
+        "Opening d'hiver : Même pas froid (presque un peu show!)",
+        "Tèmpi Tèmtoa",
+        "Tèmpi Tèmtoa",
+        "“Tu te mets combien... en science ?”"
+      ],
+      "scores": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.0,
+        "llm_context_precision_with_reference": 0.0
+      },
+      "input_tokens": 1031,
+      "output_tokens": 30,
+      "cost_usd": 0.000106,
+      "search_seconds": 0.0055,
+      "total_seconds": 0.733
+    }
+  ]
+}
